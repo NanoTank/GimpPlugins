@@ -29,6 +29,6 @@ int main(void)
   GlassPixel identity=glass_shade(opaque,1,1,1,&p);
   assert(close_enough(identity.r,opaque.r));
   assert(close_enough(identity.a,opaque.a));
-  puts("Glass core: 10 assertions passed");
+  puts("Glass core: 11 assertions passed");
   return 0;
 }
