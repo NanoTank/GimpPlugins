@@ -18,7 +18,8 @@ Python/GIMP-3-API, Script-Fu oder native GEGL-Operationen werden abhängig von d
 | `scripts/` | Bauen, Sandbox-Check, Installation (Symlink oder verwaltete Kopie) und Entfernen |
 | `docs/` | Gemeinsame Konventionen und Filteranforderungen |
 | `output/gimp-plug-ins/` | Erzeugte GIMP-Plug-in-Ordner (nicht versioniert) |
-| `output/gegl/` | Zukünftige native GEGL-`.so`-Filter (nicht versioniert) |
+| `gegl/` | Native GEGL-C-Quellen, je Filter eigenes Verzeichnis |
+| `output/gegl/` | Kompilierte native GEGL-`.so`-Filter (nicht versioniert) |
 
 ## Empfohlener Entwicklungsmodus (GIMP 3.2 Flatpak)
 
@@ -77,17 +78,36 @@ Das `output/gegl/`-Verzeichnis ist separat. Native GEGL-Operationen verwenden
 einen anderen Ladevorgang; ihre Entwicklung/Installation ist noch nicht fertig
 implementiert und muss separat in der Flatpak-Sandbox getestet werden.
 
-## Native GEGL-Filter
+## Native GEGL-Filter (neue Testinfrastruktur)
 
-`output/gegl/` ist für spätere `nanotank-*.so`-Artefakte vorgesehen.
-Das Installationsskript verlinkt vorhandene Dateien in den GEGL-Ordner.
-**Es kompiliert noch keine nativen Filter.**
-Diese müssen mit den Bibliotheken/der ABI von GIMPs Flatpak (aktuell
-GEGL 0.4.72) gebaut und getestet werden. Die auf dem Kubuntu-Host
-installierte GEGL-Version muss nicht kompatibel sein.
+Der einfache native Testfilter wird unter `gegl/nanotank-gegl-test/` entwickelt
+und später unter **Filter → NanoTank → GEGL-Test** angezeigt, wenn die
+lokale Kompilierung und die Flatpak-Ladung erfolgreich sind. Er hat einen
+Helligkeitsregler und bewahrt den Alphakanal. **Status: noch nicht lokal
+auf dem Zielrechner getestet.**
 
-GEGL-Filter sollten den Menüpfad `<Image>/Filters/NanoTank/` verwenden.
-Die erforderliche Registrierung wird im jeweiligen Filterprojekt getestet.
+```bash
+# Vorher GIMP vollständig beenden:
+bash scripts/build-gegl.sh
+bash scripts/deploy-gegl-flatpak.sh
+bash scripts/diagnose-gegl-flatpak.sh
+```
+
+Das Build-Skript nutzt **das mit GIMP gebundene Flatpak-SDK**
+(`flatpak run --devel --command=sh org.gimp.GIMP`) und verifiziert
+`pkg-config gegl-0.4`; es fällt niemals still auf die Kubuntu-Host-Bibliothek
+zurück. Ausgabe: `output/gegl/nanotank-gegl-test.so`.
+
+Das Deploy-Skript erstellt pro GEGL-Modul einen Link auf diesen Output
+**innerhalb der GIMP-Flatpak-Sandbox** und verwendet nur bei Bedarf eine
+verwaltete Kopie. Es überschreibt keine unbekannten Dateien, setzt
+`GEGL_PATH` nicht und ändert keine fremden Plug-ins.
+
+Entfernen (bei beendetem GIMP):
+`bash scripts/undeploy-gegl-flatpak.sh`
+
+Die vollständige Anleitung, Tests und Fehlerdiagnose stehen unter
+[docs/GEGL-DEVELOPMENT.md](docs/GEGL-DEVELOPMENT.md).
 
 ## Entwicklungsregeln
 
@@ -97,4 +117,5 @@ Glass-Anforderungen: [docs/GLASS-BRIEF.md](docs/GLASS-BRIEF.md).
 **Status (30.10.2026):** Python-Menüintegration und tatsächlicher Aufruf des
 Systemtests in GIMP 3.2.6 Flatpak auf Kubuntu vom Nutzer erfolgreich abgenommen.
 Der Screenshot zeigt die GIMP-Meldung „NanoTank-Systemtest erfolgreich: Plug-in geladen.“
-Native GEGL-Integration und tatsächliche Bildfilter bleiben separat zu prüfen.
+Der native GEGL-Helligkeitstest ist als Quellcode und Build-/Deploy-Weg vorbereitet;
+Kompilierung und GIMP-Abnahme stehen noch aus.
