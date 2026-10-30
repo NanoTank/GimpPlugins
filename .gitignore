@@ -1,0 +1,9 @@
+# Generierte Artefakte und lokale Testdaten
+/output/
+/build/
+/test-work/
+__pycache__/
+*.py[cod]
+*.so
+*.o
+*.log
