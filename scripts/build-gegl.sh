@@ -3,8 +3,15 @@
 # Baut GEGL-Testmodul mit dem SDK der *installierten GIMP-Flatpak-App*.
 set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
-SRC="$ROOT/gegl/nanotank-gegl-test/nanotank-gegl-test.c"
-OUT="$ROOT/output/gegl/nanotank-gegl-test.so"
+# Ohne Argument bleibt der bisherige GEGL-Systemtest das Build-Ziel.
+# Neue Module werden gezielt gebaut, nicht unbemerkt zusammen mit dem Test.
+MODULE="${1:-nanotank-gegl-test}"
+case "$MODULE" in
+  nanotank-gegl-test|nanotank-glass) ;;
+  *) echo "Unbekanntes NanoTank-GEGL-Modul: $MODULE" >&2; exit 2 ;;
+esac
+SRC="$ROOT/gegl/$MODULE/$MODULE.c"
+OUT="$ROOT/output/gegl/$MODULE.so"
 
 command -v flatpak >/dev/null || { echo "FEHLER: flatpak fehlt" >&2; exit 1; }
 [[ -f "$SRC" ]] || { echo "FEHLER: Quelle fehlt: $SRC" >&2; exit 1; }
@@ -73,7 +80,7 @@ flatpak run --devel --command=sh org.gimp.GIMP -c '
      -I"$(dirname -- "$src")" \
      -isystem "$(dirname -- "$header")" \
      $(pkg-config --cflags gegl-0.4) "$src" \
-     -o "$out.tmp" $(pkg-config --libs gegl-0.4)
+     -o "$out.tmp" $(pkg-config --libs gegl-0.4) -lm
   mv -f -- "$out.tmp" "$out"
   test -s "$out"
   printf "GEGL-Modul gebaut: %s\n" "$out"
