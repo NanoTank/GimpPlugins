@@ -15,7 +15,7 @@ Python/GIMP-3-API, Script-Fu oder native GEGL-Operationen werden abhängig von d
 | Pfad | Zweck |
 | --- | --- |
 | `plugins/` | Python-3-/GIMP-3-Quellen, jeweils eigener Ordner |
-| `scripts/` | Bauen, Symlink-Installation und Entfernen |
+| `scripts/` | Bauen, Sandbox-Check, Installation (Symlink oder verwaltete Kopie) und Entfernen |
 | `docs/` | Gemeinsame Konventionen und Filteranforderungen |
 | `output/gimp-plug-ins/` | Erzeugte GIMP-Plug-in-Ordner (nicht versioniert) |
 | `output/gegl/` | Zukünftige native GEGL-`.so`-Filter (nicht versioniert) |
@@ -33,26 +33,18 @@ flatpak run org.gimp.GIMP
 In GIMP ein Bild öffnen, danach **Filter → NanoTank → Systemtest** auswählen.
 Der Test zeigt nur eine Meldung an und verändert keine Pixel.
 
-Bei späteren Änderungen: `bash scripts/build.sh` ausführen und **GIMP neu starten**.
-Die einmal eingerichteten Symlinks zeigen automatisch auf den neuen Inhalt.
-Auch Vorabversionen können so getestet werden; ein Merge auf `main` ist nicht nötig.
+Bei späteren Änderungen **immer** `bash scripts/build.sh && bash scripts/install-flatpak.sh` ausführen und **GIMP neu starten**. Funktionierende Symlinks benötigen keine erneute Kopie; bei einem in der Sandbox nicht erreichbaren Symlink wird auf eine verwaltete Kopie umgeschaltet. Auch Vorabversionen können so getestet werden; ein Merge auf `main` ist nicht nötig.
 
 ## Installationspfade für GIMP 3.2 Flatpak
 
 - GIMP-Plug-in-Ordner: `~/.var/app/org.gimp.GIMP/config/GIMP/3.2/plug-ins/`
 - GEGL-Operationen: `~/.var/app/org.gimp.GIMP/data/gegl-0.4/plug-ins/`
 
-Die Installation legt **pro NanoTank-Plug-in** einen eigenen Symlink an;
-existierende Dateien oder fremde Erweiterungen werden nicht überschrieben.
-Niemals den gesamten GIMP-Plug-in-Ordner durch einen Symlink ersetzen.
+Die Installation prüft aus **innerhalb der Flatpak-Sandbox**, ob der einzelne Symlink erreichbar ist. Falls nicht, wird **nur die eigene NanoTank-Erweiterung** als Kopie im Benutzer-Plug-in-Verzeichnis abgelegt und mit einer Herkunftsmarkierung verwaltet. Bereits existierende fremde Ordner bleiben unangetastet. Niemals den gesamten GIMP-Plug-in-Ordner ersetzen.
 
-Entfernen: `bash scripts/uninstall-flatpak.sh` (nur Links dieses Klons).
-Die Quellen und `output/` bleiben dabei erhalten.
+Entfernen: `bash scripts/uninstall-flatpak.sh` (nur Links bzw. eindeutig markierte Kopien aus diesem Klon). Die Quellen und `output/` bleiben dabei erhalten.
 
-Wenn ein Symlink im Flatpak nicht erreichbar ist: prüfen, ob der Git-Klon
-aus der Sandbox zugänglich ist (bei dieser GIMP-Installation wurde
-`filesystem=host` gemeldet). Nicht ungeprüft globale Flatpak-Berechtigungen
-erweitern; gegebenenfalls gezielten Dateisystemzugriff konfigurieren.
+Diagnostik: `bash scripts/diagnose-flatpak.sh`. Zusätzliche globale Flatpak-Berechtigungen sind für den Kopiermodus nicht notwendig; auch `--filesystem=host` garantiert nicht, dass ein beliebiger Symlink in allen Sandbox-Konfigurationen funktioniert.
 
 ## Native GEGL-Filter
 
