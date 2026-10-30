@@ -18,7 +18,8 @@ class NanoTankSystemTest(Gimp.PlugIn):
         return [PROCEDURE]
 
     def do_set_i18n(self, procedure_name):
-        return False
+        # GIMP 3 Python-GI erwartet (enabled, gettext_domain, catalog_dir).
+        return False, None, None
 
     def do_create_procedure(self, name):
         if name != PROCEDURE:
