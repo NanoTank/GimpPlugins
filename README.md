@@ -78,6 +78,11 @@ Das `output/gegl/`-Verzeichnis ist separat. Native GEGL-Operationen verwenden
 einen anderen Ladevorgang; ihre Entwicklung/Installation ist noch nicht fertig
 implementiert und muss separat in der Flatpak-Sandbox getestet werden.
 
+- **GEGL SDK:** Ein erster Build scheiterte an fehlender pkg-config-Erkennung.
+  `scripts/build-gegl.sh` prüft jetzt GIMP-interne `/app`-Pfade;
+  `bash scripts/diagnose-gegl-sdk.sh` liefert bei Problemen eine
+  lesende Diagnose. **Native GEGL-Tests sind noch nicht abgenommen.**
+
 ## Native GEGL-Filter (neue Testinfrastruktur)
 
 Der einfache native Testfilter wird unter `gegl/nanotank-gegl-test/` entwickelt
@@ -88,8 +93,8 @@ auf dem Zielrechner getestet.**
 
 ```bash
 # Vorher GIMP vollständig beenden:
-bash scripts/build-gegl.sh
-bash scripts/deploy-gegl-flatpak.sh
+bash scripts/build-gegl.sh && \
+bash scripts/deploy-gegl-flatpak.sh && \
 bash scripts/diagnose-gegl-flatpak.sh
 ```
 
