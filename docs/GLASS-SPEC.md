@@ -1,6 +1,8 @@
 # NanoTank Glass — Spezifikation P0
 
-**Stand:** 30.10.2026. **Branch:** `feature/nanotank-glass`. **Status:** Quellprototyp, Flatpak-Build und GIMP-Abnahme noch offen.
+**Stand:** 31.10.2026. **Branch:** `feature/nanotank-glass`. **Status:** P1 kompiliert und in GEGL gerendert; neue GIMP- und Nutzerabnahme offen.
+
+Aktueller verbindlicher P1-Teststand, Parameteränderungen, Architektur und Befehle: [GLASS-P1.md](GLASS-P1.md). Die folgenden P0-Angaben beschreiben den historischen Ausgangspunkt.
 
 ## Zweck
 
