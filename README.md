@@ -20,31 +20,62 @@ Python/GIMP-3-API, Script-Fu oder native GEGL-Operationen werden abhängig von d
 | `output/gimp-plug-ins/` | Erzeugte GIMP-Plug-in-Ordner (nicht versioniert) |
 | `output/gegl/` | Zukünftige native GEGL-`.so`-Filter (nicht versioniert) |
 
-## Erster Test
+## Empfohlener Entwicklungsmodus (GIMP 3.2 Flatpak)
 
-Im lokalen Git-Klon:
+**Direkt aus `output/` laden – ohne Symlink oder Kopie.**
+
+1. Einmalig in GIMP: **Bearbeiten → Einstellungen → Ordner → Plug-ins**.
+   Dort den folgenden Ordner als **zusätzlichen** Suchpfad hinzufügen
+   (bestehende Pfade beibehalten):
+
+   `/home/mic/Projekte/GimpPlugins/output/gimp-plug-ins`
+
+   Alternativ kann derselbe Pfad passend zum lokalen Git-Klon angegeben werden.
+   In der GIMP-Flatpak-Sandbox auf der Zielmaschine ist dieser Projektpfad
+   nachweislich lesbar (Diagnose 2026-10-30). Ob GIMP den Systemtest erfolgreich
+   registriert, muss nach der Änderung in GIMP noch geprüft werden.
+
+2. Im lokalen Git-Klon:
+
+   ```bash
+   bash scripts/build.sh
+   ```
+
+3. GIMP vollständig beenden und neu starten, ein Bild öffnen und
+   **Filter → NanoTank → Systemtest** aufrufen.
+
+Bei späteren Python-Plugin-Änderungen reicht `bash scripts/build.sh` und ein
+Neustart von GIMP. Die GIMP-Menüintegration kann so auch Feature-Branches und
+Vorabversionen testen, ohne diese nach `main` zu mergen.
+
+## Alternative Installation und Diagnose
+
+Es gibt weiterhin `scripts/install-flatpak.sh` und
+`scripts/uninstall-flatpak.sh`, um einzelne NanoTank-Plug-ins in einem
+GIMP-Benutzerverzeichnis zu verlinken oder eine eindeutig markierte Kopie
+anzulegen/zu entfernen. **Auf der Zielmaschine zeigte die Flatpak-Diagnose aber,
+dass sogar eine installierte Kopie im Benutzerverzeichnis aus der Sandbox nicht
+erreichbar ist.** Diese Methode deshalb vorerst **nicht** als funktionierend
+betrachten und lieber den direkten Suchpfad verwenden.
+
+Die GIMP-3.2-Benutzerkonfiguration liegt normalerweise unter
+`$XDG_CONFIG_HOME/GIMP/3.2/` (im Flatpak-Kontext), die GIMP-Benutzer-Plug-ins
+unter `plug-ins/`. Welchen Pfad die laufende GIMP-Instanz tatsächlich scannt,
+zeigt **Bearbeiten → Einstellungen → Ordner → Plug-ins**.
+
+Für eine genaue Erreichbarkeitsprüfung:
 
 ```bash
-bash scripts/build.sh
-bash scripts/install-flatpak.sh
-flatpak run org.gimp.GIMP
+bash scripts/diagnose-flatpak.sh
 ```
 
-In GIMP ein Bild öffnen, danach **Filter → NanoTank → Systemtest** auswählen.
-Der Test zeigt nur eine Meldung an und verändert keine Pixel.
+Die Diagnose darf nie als Beleg dafür ausgegeben werden, dass GIMP das Plug-in
+bereits registriert hat. Der entscheidende Akzeptanztest ist ein sichtbarer und
+aufrufbarer **Systemtest** im GIMP-Menü. Der Eintrag verändert keine Bildpixel.
 
-Bei späteren Änderungen **immer** `bash scripts/build.sh && bash scripts/install-flatpak.sh` ausführen und **GIMP neu starten**. Funktionierende Symlinks benötigen keine erneute Kopie; bei einem in der Sandbox nicht erreichbaren Symlink wird auf eine verwaltete Kopie umgeschaltet. Auch Vorabversionen können so getestet werden; ein Merge auf `main` ist nicht nötig.
-
-## Installationspfade für GIMP 3.2 Flatpak
-
-- GIMP-Plug-in-Ordner: `~/.var/app/org.gimp.GIMP/config/GIMP/3.2/plug-ins/`
-- GEGL-Operationen: `~/.var/app/org.gimp.GIMP/data/gegl-0.4/plug-ins/`
-
-Die Installation prüft aus **innerhalb der Flatpak-Sandbox**, ob der einzelne Symlink erreichbar ist. Falls nicht, wird **nur die eigene NanoTank-Erweiterung** als Kopie im Benutzer-Plug-in-Verzeichnis abgelegt und mit einer Herkunftsmarkierung verwaltet. Bereits existierende fremde Ordner bleiben unangetastet. Niemals den gesamten GIMP-Plug-in-Ordner ersetzen.
-
-Entfernen: `bash scripts/uninstall-flatpak.sh` (nur Links bzw. eindeutig markierte Kopien aus diesem Klon). Die Quellen und `output/` bleiben dabei erhalten.
-
-Diagnostik: `bash scripts/diagnose-flatpak.sh`. Zusätzliche globale Flatpak-Berechtigungen sind für den Kopiermodus nicht notwendig; auch `--filesystem=host` garantiert nicht, dass ein beliebiger Symlink in allen Sandbox-Konfigurationen funktioniert.
+Das `output/gegl/`-Verzeichnis ist separat. Native GEGL-Operationen verwenden
+einen anderen Ladevorgang; ihre Entwicklung/Installation ist noch nicht fertig
+implementiert und muss separat in der Flatpak-Sandbox getestet werden.
 
 ## Native GEGL-Filter
 
