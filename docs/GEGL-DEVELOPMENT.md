@@ -3,6 +3,30 @@
 Status: **Quellcode und Build-/Deploy-Skripte bereit, noch nicht in der
 Nutzerinstallation kompiliert oder in GIMP aufgerufen**.
 
+## Aktueller SDK-Befund (30.10.2026)
+
+Der erste Buildversuch schlug mit `gegl-0.4.pc fehlt im GIMP-SDK` fehl.
+Deshalb prüft `build-gegl.sh` jetzt explizit die GIMP-internen
+`/app/**/pkgconfig`-Verzeichnisse und den Operationsheader
+`gegl-op.h`. Das erste Skript hatte sich zu stark auf die automatische
+`pkg-config`-Pfaderkennung verlassen.
+
+Falls die Dateien tatsächlich fehlen, **keine Host-GEGL-Bibliotheken
+dazumischen** und keine GIMP-Einstellungen ändern. Stattdessen:
+
+```bash
+bash scripts/diagnose-gegl-sdk.sh
+```
+
+Die Ausgabe dokumentiert Compiler, Pfade, Bibliotheken und
+Entwicklerdateien direkt innerhalb der installierten GIMP-Flatpak-SDK-Sandbox.
+Die neue Pfadkorrektur ist **noch nicht auf dem Zielrechner bestätigt**.
+Kompilierung, Installation und Menüregistrierung bleiben getrennte Tests.
+
+**Wichtig:** Folgebefehle im Terminal mit `&&` verknüpfen, damit die
+Installation bei einem fehlgeschlagenen Build nicht trotzdem anläuft.
+GEGL-Deploy erfordert außerdem, dass GIMP vollständig geschlossen ist.
+
 ## Voraussetzungen
 
 - GIMP 3.2.6 als Flatpak, GEGL 0.4.72 (Versionen gemäß Nutzer-Debugausgabe).
@@ -19,7 +43,9 @@ GIMP zunächst **vollständig schließen**, dann:
 cd ~/Projekte/GimpPlugins
 git switch feature/plugin-foundation
 git pull --ff-only
-bash scripts/build-gegl.sh
+bash scripts/build-gegl.sh && \
+bash scripts/deploy-gegl-flatpak.sh && \
+bash scripts/diagnose-gegl-flatpak.sh
 ```
 
 Das Skript verwendet `flatpak run --devel --command=sh org.gimp.GIMP`,
@@ -31,10 +57,9 @@ Ausgabe: `output/gegl/nanotank-gegl-test.so`.
 
 ## In GIMP integrieren
 
-```bash
-bash scripts/deploy-gegl-flatpak.sh
-bash scripts/diagnose-gegl-flatpak.sh
-```
+Nach **erfolgreichem** Build führt die obige Befehlskette Deployment und
+Diagnose aus. Sie kann bei einem späteren erfolgreichen Build auch separat
+wiederholt werden.
 
 Das Deploy-Skript legt die GEGL-Module im **über Flatpak ermittelten**
 `$XDG_DATA_HOME/gegl-0.4/plug-ins/` ab; zuerst ein Symlink
