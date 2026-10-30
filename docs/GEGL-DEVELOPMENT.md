@@ -1,7 +1,8 @@
 # NanoTank GEGL – nativer Funktionstest für GIMP 3.2 Flatpak
 
-Status: **Quellcode und Build-/Deploy-Skripte bereit, noch nicht in der
-Nutzerinstallation kompiliert oder in GIMP aufgerufen**.
+Status (30.10.2026): **Build, Flatpak-Ladung, GIMP-Filterdialog und sichtbare
+Helligkeitsänderung erfolgreich vom Nutzer abgenommen.** Noch offen: Undo/Redo,
+Ebenenfilter wieder bearbeiten, Alpha-/Auswahltests und XCF-Persistenz.
 
 ## Aktueller SDK-Befund (30.10.2026)
 
@@ -25,7 +26,7 @@ Die SDK-Pfade sind auf dem Zielrechner inzwischen bestätigt (GEGL 0.4.72,
 Der Compiler scheiterte danach daran, dass `gegl-op.h` die Quelldatei
 `nanotank-gegl-test.c` ein zweites Mal inkludiert, das eigene Quellverzeichnis
 aber noch nicht im Include-Suchpfad lag. `build-gegl.sh` setzt nun explizit
-`-I"$(dirname "$src")"`. **Dieser Fix ist noch nicht lokal getestet.**
+`-I"$(dirname "$src")"`. **Dieser Fix wurde lokal erfolgreich getestet.**
 Kompilierung, Installation und Menüregistrierung bleiben getrennte Tests.
 
 **Wichtig:** Folgebefehle im Terminal mit `&&` verknüpfen, damit die
