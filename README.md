@@ -122,5 +122,7 @@ Glass-Anforderungen: [docs/GLASS-BRIEF.md](docs/GLASS-BRIEF.md).
 **Status (30.10.2026):** Python-Menüintegration und tatsächlicher Aufruf des
 Systemtests in GIMP 3.2.6 Flatpak auf Kubuntu vom Nutzer erfolgreich abgenommen.
 Der Screenshot zeigt die GIMP-Meldung „NanoTank-Systemtest erfolgreich: Plug-in geladen.“
-Der native GEGL-Helligkeitstest ist als Quellcode und Build-/Deploy-Weg vorbereitet;
-Kompilierung und GIMP-Abnahme stehen noch aus.
+Auch der native GEGL-Helligkeitstest wurde erfolgreich gegen GEGL 0.4.72
+kompiliert, in GIMP geladen und mit sichtbarer Helligkeitsänderung und
+regulärem Einstellungsdialog vom Nutzer abgenommen. Undo/Redo, persistente
+Ebenenfilter, XCF-Speichern/Laden und Alphakanal sind noch separat zu testen.
