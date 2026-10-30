@@ -1,6 +1,7 @@
 # Gemeinsame Entwicklungsregeln
 
 - Repository: https://github.com/NanoTank/GimpPlugins
+- GitHub-Arbeitsbereich ist ausschließlich der persönliche Account `NanoTank` und dessen Repositories. Keine Lese- oder Schreibaktionen auf Repositories fremder Organisationen, in denen der Nutzer Mitglied ist.
 - GIMP 3.2.6 Flatpak als primäre Zielplattform.
 - Alle GIMP-Prozeduren unter `<Image>/Filters/NanoTank/`, wenn die API dies zulässt.
 - Eindeutige Prozedur-IDs und Binärdateinamen mit Präfix `nanotank-`.
