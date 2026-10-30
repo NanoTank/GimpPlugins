@@ -4,6 +4,18 @@ Gemeinsame, offene Entwicklungsbasis für GIMP-3-Filter und Plug-ins.
 Zielumgebung: **Kubuntu 26.04, GIMP 3.2.6 als Flatpak** (Stand Oktober 2026).
 Lizenz: MIT (siehe [LICENSE](LICENSE)).
 
+## Codex: Projektvorgaben
+
+- **[AGENTS.md](AGENTS.md)** wird beim Start einer neuen Codex-Sitzung als
+  projektweite Arbeitsanweisung geladen.
+- **[docs/FILTER-SPEC-TEMPLATE.md](docs/FILTER-SPEC-TEMPLATE.md)** ist die
+  Vorlage für neue Filter-Anforderungen.
+- Allgemeine technische Regeln: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+- Erster konkreter Filter: [docs/GLASS-BRIEF.md](docs/GLASS-BRIEF.md).
+- Bildfilter grundsätzlich **GEGL-first**; Python/Script-Fu nur als begründete
+  Unterstützung. Keine automatischen GitHub-Actions/CI-Pipelines.
+
+
 ## Ziel
 
 Alle Erweiterungen erscheinen möglichst unter **Filter → NanoTank**.
