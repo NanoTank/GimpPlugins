@@ -7,8 +7,29 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 OUT="$ROOT/output/gegl"
 command -v flatpak >/dev/null || { echo "FEHLER: flatpak fehlt" >&2; exit 1; }
 
-if flatpak ps --columns=application 2>/dev/null | grep -Fxq 'org.gimp.GIMP'; then
-  echo "Bitte GIMP vollständig beenden, bevor geladene GEGL-Module aktualisiert werden." >&2
+# Der unmittelbar vorherige Build startet selbst eine GIMP-Flatpak-Sandbox
+# (--devel --command=sh). Deren Flatpak-Instanz kann nach dem beendeten Build
+# noch kurz in "flatpak ps" sichtbar sein. Nicht sofort fälschlich abbrechen,
+# aber niemals ein geladenes GEGL-Modul in einer laufenden GIMP-Sitzung ersetzen.
+gimp_instance_running() {
+  flatpak ps --columns=application 2>/dev/null | grep -Fxq 'org.gimp.GIMP'
+}
+
+if gimp_instance_running; then
+  echo "GIMP-Flatpak-Instanz erkannt; prüfe kurz auf auslaufende Build-Sandbox ..."
+  for attempt in 1 2 3 4 5 6 7 8 9 10; do
+    sleep 0.3
+    if ! gimp_instance_running; then
+      break
+    fi
+  done
+fi
+
+if gimp_instance_running; then
+  echo "GIMP-Flatpak ist nach der kurzen Wartezeit weiterhin registriert." >&2
+  echo "Zum Schutz vor Austausch geladener GEGL-Module wird nicht installiert." >&2
+  echo "Zur Diagnose laufender Instanzen:" >&2
+  flatpak ps --columns=instance,application,pid,child-pid >&2 || true
   exit 1
 fi
 
