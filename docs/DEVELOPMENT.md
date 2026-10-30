@@ -3,6 +3,9 @@
 - Repository: https://github.com/NanoTank/GimpPlugins
 - GitHub-Arbeitsbereich ist ausschließlich der persönliche Account `NanoTank` und dessen Repositories. Keine Lese- oder Schreibaktionen auf Repositories fremder Organisationen, in denen der Nutzer Mitglied ist.
 - GIMP 3.2.6 Flatpak als primäre Zielplattform.
+- **GEGL-first:** Alle eigentlichen Bild-/Materialeffekte standardmäßig als native GEGL-Operationen implementieren; nicht jedes Mal Python- oder Script-Fu-Bildfilter anlegen.
+- Python-/Script-Fu-Code nur bei nachweislichem Bedarf als dünne Ergänzung nutzen, etwa um GIMP-Ebenen, Auswahlkontexte oder Abläufe zu steuern, die GEGL allein nicht bereitstellt. Die Bildberechnung bleibt bevorzugt GEGL.
+- Eingebaute GIMP-/GEGL-Funktionen bevorzugen, wo sie die Anforderungen ohne Qualitätsverlust erfüllen.
 - Alle GIMP-Prozeduren unter `<Image>/Filters/NanoTank/`, wenn die API dies zulässt.
 - Eindeutige Prozedur-IDs und Binärdateinamen mit Präfix `nanotank-`.
 - Ein Filter pro Verzeichnis / Feature-Branch. `main` enthält nur abgenommene Versionen.
@@ -17,8 +20,7 @@
   `scripts/deploy-gegl-flatpak.sh` (eigenen Symlink bevorzugen, sonst verwaltete
   Kopie); kein globales `GEGL_PATH` setzen oder fremde Filter überschreiben.
 - Vor Update/Entfernen nativer GEGL-Dateien GIMP vollständig schließen.
-- Es gelten zwei getrennte Abnahmen: Python-Menütest bestanden,
-  nativer GEGL-Menü-/Reglertest noch nicht auf Zielsystem ausgeführt.
+- Python-Menütest und nativer GEGL-Menü-/Reglertest in GIMP 3.2.6 Flatpak bestanden; erweiterte Persistenz-, Alpha- und Auswahltests pro Filter weiterhin erforderlich.
 - Nach neuen oder aktualisierten Plug-ins GIMP komplett neu starten.
 - `scripts/install-flatpak.sh` ist idempotent und überschreibt keine fremden Installationen.
 - Fehler nicht durch Löschen der bestehenden GIMP-Konfiguration kaschieren.
