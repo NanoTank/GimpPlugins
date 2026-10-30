@@ -53,6 +53,13 @@ class GlassContract(unittest.TestCase):
         self.assertIn('[ "$wanted" = all ] || [ "$name" = "$wanted.so" ] || continue', UNDEPLOY)
         self.assertNotIn("GEGL_PATH=", DEPLOY)
 
+    def test_deploy_waits_for_transient_sdk_sandbox_without_disabling_guard(self):
+        self.assertIn("gimp_instance_running()", DEPLOY)
+        self.assertIn("for attempt in 1 2 3 4 5 6 7 8 9 10", DEPLOY)
+        self.assertIn("if gimp_instance_running; then", DEPLOY)
+        self.assertIn("Zum Schutz vor Austausch geladener GEGL-Module", DEPLOY)
+        self.assertIn("flatpak ps --columns=instance,application,pid,child-pid", DEPLOY)
+
     def test_limits_and_acceptance_documented(self):
         for keyword in ("Hintergrund", "Auswahlkontur", "Undo/Redo", "Flatpak"):
             self.assertIn(keyword, SPEC)
