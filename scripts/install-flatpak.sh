@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
+# Symlink when visible in the sandbox, otherwise a managed copy.
 set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
@@ -7,38 +8,124 @@ GIMP_PLUGINS="${NANOTANK_GIMP_PLUGINS_DIR:-$HOME/.var/app/org.gimp.GIMP/config/G
 GEGL_PLUGINS="${NANOTANK_GEGL_PLUGINS_DIR:-$HOME/.var/app/org.gimp.GIMP/data/gegl-0.4/plug-ins}"
 OUT="$ROOT/output"
 if [[ ! -d "$OUT/gimp-plug-ins" ]]; then
-  printf 'Noch keine Ausgabe vorhanden. Zuerst: bash scripts/build.sh\n' >&2
+  printf 'Zuerst: bash scripts/build.sh\n' >&2
   exit 1
 fi
-
 mkdir -p -- "$GIMP_PLUGINS" "$GEGL_PLUGINS"
-link_safely() {
-  local source="$1" dest="$2"
-  if [[ -L "$dest" ]] && [[ "$(readlink -- "$dest")" == "$source" ]]; then
-    printf 'Bereits verlinkt: %s\n' "$dest"
-  elif [[ -e "$dest" || -L "$dest" ]]; then
-    printf 'KONFLIKT (nicht überschrieben): %s\n' "$dest" >&2
+
+# Test the destination as GIMP sees it, not the host's symlink resolution.
+sandbox_can_read() {
+  local target="$1" executable="$2"
+  command -v flatpak >/dev/null 2>&1 || return 1
+  flatpak run --command=sh org.gimp.GIMP -c '
+    test -f "$1" && test -r "$1" && { test "$2" != yes || test -x "$1"; }
+  ' sh "$target" "$executable" >/dev/null 2>&1
+}
+
+# Build a private staging copy and replace only a previously-owned installation.
+# The marker records the original source and is checked before updating/removing.
+copy_plugin() {
+  local source="$1" dest="$2" stage old="" parent
+  parent="$(dirname -- "$dest")"
+  stage="$(mktemp -d "$parent/.nanotank-stage.XXXXXXXX")"
+  if ! cp -a -- "$source/." "$stage/"; then
+    rm -rf -- "$stage"
     return 1
+  fi
+  printf '%s\n' "$source" > "$stage/.nanotank-managed-origin"
+  if [[ -L "$dest" ]]; then
+    rm -- "$dest"
+  elif [[ -d "$dest" ]]; then
+    old="$(mktemp -d "$parent/.nanotank-old.XXXXXXXX")"
+    rmdir -- "$old"
+    mv -- "$dest" "$old"
+  fi
+  if ! mv -- "$stage" "$dest"; then
+    [[ -z "$old" ]] || mv -- "$old" "$dest"
+    return 1
+  fi
+  [[ -z "$old" ]] || rm -rf -- "$old"
+  printf 'Sandbox-taugliche Kopie installiert: %s\n' "$dest"
+}
+
+install_plugin() {
+  local source="$1" dest="$2" name entry
+  name="$(basename -- "$source")"
+  entry="$name.py"
+  [[ -x "$source/$entry" ]] || entry="$name"
+  if [[ ! -f "$source/$entry" || ! -x "$source/$entry" ]]; then
+    printf 'Fehlender ausführbarer Einstiegspunkt: %s\n' "$source" >&2
+    return 1
+  fi
+
+  if [[ -L "$dest" ]]; then
+    if [[ "$(readlink -- "$dest")" != "$source" ]]; then
+      printf 'KONFLIKT (fremder Symlink): %s\n' "$dest" >&2
+      return 1
+    fi
+  elif [[ -e "$dest" ]]; then
+    if [[ ! -d "$dest" || ! -f "$dest/.nanotank-managed-origin" ||
+          "$(cat -- "$dest/.nanotank-managed-origin")" != "$source" ]]; then
+      printf 'KONFLIKT (fremde Installation): %s\n' "$dest" >&2
+      return 1
+    fi
+    copy_plugin "$source" "$dest"
+    return
   else
     ln -s -- "$source" "$dest"
-    printf 'Verlinkt: %s -> %s\n' "$dest" "$source"
+  fi
+
+  if sandbox_can_read "$dest/$entry" yes; then
+    printf 'Sandbox-Symlink funktioniert: %s\n' "$dest"
+  else
+    printf 'Symlink in Flatpak nicht erreichbar, verwende Kopie: %s\n' "$dest"
+    copy_plugin "$source" "$dest"
+  fi
+}
+
+# .so files use a small sidecar ownership marker only for managed copies.
+install_gegl() {
+  local source="$1" dest="$2" marker stage
+  marker="$(dirname -- "$dest")/.nanotank-$(basename -- "$source").origin"
+  if [[ -L "$dest" ]]; then
+    if [[ "$(readlink -- "$dest")" != "$source" ]]; then
+      printf 'KONFLIKT (fremder GEGL-Symlink): %s\n' "$dest" >&2
+      return 1
+    fi
+  elif [[ -e "$dest" ]]; then
+    if [[ ! -f "$marker" || "$(cat -- "$marker")" != "$source" ]]; then
+      printf 'KONFLIKT (fremder GEGL-Filter): %s\n' "$dest" >&2
+      return 1
+    fi
+    stage="$(mktemp "$(dirname -- "$dest")/.nanotank-gegl.XXXXXXXX")"
+    cp -p -- "$source" "$stage"
+    mv -f -- "$stage" "$dest"
+    printf 'GEGL-Kopie aktualisiert: %s\n' "$dest"
+    return
+  else
+    ln -s -- "$source" "$dest"
+  fi
+
+  if sandbox_can_read "$dest" no; then
+    printf 'GEGL-Symlink funktioniert: %s\n' "$dest"
+  else
+    printf 'GEGL-Symlink in Flatpak nicht erreichbar, verwende Kopie: %s\n' "$dest"
+    stage="$(mktemp "$(dirname -- "$dest")/.nanotank-gegl.XXXXXXXX")"
+    cp -p -- "$source" "$stage"
+    rm -- "$dest"    # Only our own symlink, verified above.
+    mv -- "$stage" "$dest"
+    printf '%s\n' "$source" > "$marker"
   fi
 }
 
 shopt -s nullglob
 for source in "$OUT/gimp-plug-ins"/nanotank-*; do
   [[ -d "$source" ]] || continue
-  name="$(basename -- "$source")"
-  if [[ ! -x "$source/$name.py" && ! -x "$source/$name" ]]; then
-    printf 'Übersprungen, kein ausführbarer Einstiegspunkt: %s\n' "$source" >&2
-    continue
-  fi
-  link_safely "$source" "$GIMP_PLUGINS/$name"
+  install_plugin "$source" "$GIMP_PLUGINS/$(basename -- "$source")"
 done
 for source in "$OUT/gegl"/nanotank-*.so; do
   [[ -f "$source" ]] || continue
-  link_safely "$source" "$GEGL_PLUGINS/$(basename -- "$source")"
+  install_gegl "$source" "$GEGL_PLUGINS/$(basename -- "$source")"
 done
-
-printf '\nErledigt. GIMP komplett beenden und neu starten.\n'
-printf 'Systemtest: Bild öffnen -> Filter -> NanoTank -> Systemtest.\n'
+printf '\nInstallation fertig. GIMP komplett neu starten.\n'
+printf 'Bei Änderungen: bash scripts/build.sh && bash scripts/install-flatpak.sh\n'
