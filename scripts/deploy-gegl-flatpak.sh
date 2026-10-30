@@ -12,8 +12,18 @@ if flatpak ps --columns=application 2>/dev/null | grep -Fxq 'org.gimp.GIMP'; the
   exit 1
 fi
 
+# Optional genau ein Modul installieren, ohne andere NanoTank-Module
+# erneut anzufassen: bash scripts/deploy-gegl-flatpak.sh nanotank-glass
 shopt -s nullglob
-files=("$OUT"/nanotank-*.so)
+if (( $# > 0 )); then
+  case "$1" in
+    nanotank-gegl-test|nanotank-glass) ;;
+    *) echo "Unbekanntes NanoTank-Modul: $1" >&2; exit 2 ;;
+  esac
+  files=("$OUT/$1.so")
+else
+  files=("$OUT"/nanotank-*.so)
+fi
 if (( ${#files[@]} == 0 )); then
   echo "Keine GEGL-Module in output/gegl/. Zuerst: bash scripts/build-gegl.sh" >&2
   exit 1
@@ -75,4 +85,4 @@ for source in "${files[@]}"; do
     echo "Verwaltete GEGL-Kopie in Flatpak installiert: $dest"
   ' sh "$source"
 done
-printf '\nGIMP neu starten und Filter → NanoTank → GEGL-Test prüfen.\n'
+printf '\nGIMP vollständig neu starten und NanoTank-Menü prüfen.\n'
