@@ -94,5 +94,7 @@ Die erforderliche Registrierung wird im jeweiligen Filterprojekt getestet.
 Siehe [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 Glass-Anforderungen: [docs/GLASS-BRIEF.md](docs/GLASS-BRIEF.md).
 
-**Status:** Grundgerüst und Python-Menütest vorhanden; Ausführung im echten
-GIMP-Flatpak muss lokal abgenommen werden. Noch kein Bildfilter implementiert.
+**Status (30.10.2026):** Python-Menüintegration und tatsächlicher Aufruf des
+Systemtests in GIMP 3.2.6 Flatpak auf Kubuntu vom Nutzer erfolgreich abgenommen.
+Der Screenshot zeigt die GIMP-Meldung „NanoTank-Systemtest erfolgreich: Plug-in geladen.“
+Native GEGL-Integration und tatsächliche Bildfilter bleiben separat zu prüfen.
