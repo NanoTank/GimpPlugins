@@ -11,8 +11,14 @@
 - Bei nativen GEGL-Filtern ABI und Bibliotheksversion **innerhalb** der Flatpak-Laufzeit verifizieren.
 - Python-GIMP-Plug-ins werden in `plugins/nanotank-name/nanotank-name.py` geführt.
   `scripts/build.sh` kopiert sie nach `output/gimp-plug-ins/`.
-- Native GEGL-`.so` werden künftig aus einem separaten, versionierten
-  Build-Prozess nach `output/gegl/` ausgegeben, nicht in Git committet.
+- Native GEGL-Quellen liegen in `gegl/`; Build mit GIMPs passendem Flatpak-SDK
+  über `scripts/build-gegl.sh`, Ausgabe nach `output/gegl/` (nicht in Git).
+- GEGL-Ladung über Flatpak-Benutzerverzeichnis mittels
+  `scripts/deploy-gegl-flatpak.sh` (eigenen Symlink bevorzugen, sonst verwaltete
+  Kopie); kein globales `GEGL_PATH` setzen oder fremde Filter überschreiben.
+- Vor Update/Entfernen nativer GEGL-Dateien GIMP vollständig schließen.
+- Es gelten zwei getrennte Abnahmen: Python-Menütest bestanden,
+  nativer GEGL-Menü-/Reglertest noch nicht auf Zielsystem ausgeführt.
 - Nach neuen oder aktualisierten Plug-ins GIMP komplett neu starten.
 - `scripts/install-flatpak.sh` ist idempotent und überschreibt keine fremden Installationen.
 - Fehler nicht durch Löschen der bestehenden GIMP-Konfiguration kaschieren.
