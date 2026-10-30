@@ -5,40 +5,37 @@ set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 PLUGINS="${NANOTANK_GIMP_PLUGINS_DIR:-$HOME/.var/app/org.gimp.GIMP/config/GIMP/3.2/plug-ins}"
-ENTRY="$PLUGINS/nanotank-systemtest/nanotank-systemtest.py"
 SOURCE="$ROOT/output/gimp-plug-ins/nanotank-systemtest/nanotank-systemtest.py"
+INSTALL="$PLUGINS/nanotank-systemtest"
+ENTRY="$INSTALL/nanotank-systemtest.py"
 
 printf 'Projekt: %s\n' "$ROOT"
 printf 'Erzeugt: %s\n' "$SOURCE"
-if [[ -f "$SOURCE" && -x "$SOURCE" ]]; then
-  printf 'OK: gebautes Plug-in existiert und ist ausführbar\n'
+[[ -f "$SOURCE" && -x "$SOURCE" ]] && echo 'OK: Build ausführbar' || echo 'FEHLT: Build nicht ausführbar'
+if [[ -L "$INSTALL" ]]; then
+  printf 'Installation: Symlink -> %s\n' "$(readlink -- "$INSTALL")"
+elif [[ -f "$INSTALL/.nanotank-managed-origin" ]]; then
+  printf 'Installation: verwaltete Kopie von %s\n' "$(cat -- "$INSTALL/.nanotank-managed-origin")"
 else
-  printf 'FEHLT: gebautes Plug-in. Zuerst bash scripts/build.sh ausführen\n'
+  printf 'Installation: nicht vorhanden oder nicht NanoTank-verwaltet\n'
 fi
-
-printf 'Installiert: %s\n' "$ENTRY"
-if [[ -L "$PLUGINS/nanotank-systemtest" ]]; then
-  printf 'Symlink-Ziel: %s\n' "$(readlink -- "$PLUGINS/nanotank-systemtest")"
-else
-  printf 'Kein Verzeichnis-Symlink für Systemtest vorhanden\n'
-fi
-if [[ -f "$ENTRY" && -x "$ENTRY" ]]; then
-  printf 'OK: Installation über Host erreichbar und ausführbar\n'
-else
-  printf 'FEHLT: über Host nicht ausführbar/erreichbar\n'
-fi
+[[ -f "$ENTRY" && -x "$ENTRY" ]] && echo 'OK: Host kann Plug-in ausführen' || echo 'FEHLT: Host kann Plug-in nicht ausführen'
 
 if command -v flatpak >/dev/null 2>&1; then
-  printf '\nPrüfung innerhalb der GIMP-Flatpak-Sandbox:\n'
+  printf '\nPrüfung in der GIMP-Flatpak-Sandbox:\n'
   flatpak run --command=sh org.gimp.GIMP -c '
-    p="$XDG_CONFIG_HOME/GIMP/3.2/plug-ins/nanotank-systemtest/nanotank-systemtest.py"
-    printf "XDG_CONFIG_HOME=%s\n" "$XDG_CONFIG_HOME"
-    if [ -f "$p" ] && [ -x "$p" ]; then
-      printf "OK: Systemtest in Sandbox erreichbar und ausführbar\n"
-    else
-      printf "FEHLT: Systemtest in Sandbox nicht ausführbar/erreichbar: %s\n" "$p"
+    echo "XDG_CONFIG_HOME=$XDG_CONFIG_HOME"
+    for p in "$1" "$2"; do
+      if [ -f "$p" ] && [ -x "$p" ]; then
+        printf "OK: %s\n" "$p"
+      else
+        printf "NICHT ERREICHBAR: %s\n" "$p"
+      fi
+    done
+    if [ -L "$3" ]; then
+      printf "GIMP-Plug-in-Verzeichnis ist Symlink: "
+      readlink "$3"
     fi
-  '
+  ' sh "$SOURCE" "$ENTRY" "$INSTALL"
 fi
-
-printf '\nGIMP: Bearbeiten → Einstellungen → Ordner → Plug-ins prüfen.\n'
+printf '\nIn GIMP ggf. Bearbeiten → Einstellungen → Ordner → Plug-ins kontrollieren.\n'
