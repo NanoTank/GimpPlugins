@@ -25,7 +25,7 @@ sandbox_can_read() {
 # Build a private staging copy and replace only a previously-owned installation.
 # The marker records the original source and is checked before updating/removing.
 copy_plugin() {
-  local source="$1" dest="$2" stage old="" parent
+  local source="$1" dest="$2" entry="$3" stage old="" parent
   parent="$(dirname -- "$dest")"
   stage="$(mktemp -d "$parent/.nanotank-stage.XXXXXXXX")"
   if ! cp -a -- "$source/." "$stage/"; then
@@ -45,7 +45,13 @@ copy_plugin() {
     return 1
   fi
   [[ -z "$old" ]] || rm -rf -- "$old"
-  printf 'Sandbox-taugliche Kopie installiert: %s\n' "$dest"
+  if sandbox_can_read "$dest/$entry" yes; then
+    printf 'Kopie installiert und in GIMP-Flatpak erreichbar: %s\n' "$dest"
+  else
+    printf 'FEHLER: Auch die Kopie ist in GIMP-Flatpak nicht erreichbar: %s\n' "$dest" >&2
+    printf 'Bitte in GIMP als zusätzliches Plug-in-Verzeichnis eintragen: %s\n' "$ROOT/output/gimp-plug-ins" >&2
+    return 1
+  fi
 }
 
 install_plugin() {
@@ -69,7 +75,7 @@ install_plugin() {
       printf 'KONFLIKT (fremde Installation): %s\n' "$dest" >&2
       return 1
     fi
-    copy_plugin "$source" "$dest"
+    copy_plugin "$source" "$dest" "$entry"
     return
   else
     ln -s -- "$source" "$dest"
@@ -79,7 +85,7 @@ install_plugin() {
     printf 'Sandbox-Symlink funktioniert: %s\n' "$dest"
   else
     printf 'Symlink in Flatpak nicht erreichbar, verwende Kopie: %s\n' "$dest"
-    copy_plugin "$source" "$dest"
+    copy_plugin "$source" "$dest" "$entry"
   fi
 }
 
@@ -100,7 +106,12 @@ install_gegl() {
     stage="$(mktemp "$(dirname -- "$dest")/.nanotank-gegl.XXXXXXXX")"
     cp -p -- "$source" "$stage"
     mv -f -- "$stage" "$dest"
-    printf 'GEGL-Kopie aktualisiert: %s\n' "$dest"
+    if sandbox_can_read "$dest" no; then
+      printf 'GEGL-Kopie in Flatpak erreichbar: %s\n' "$dest"
+    else
+      printf 'FEHLER: GEGL-Kopie im Flatpak nicht erreichbar: %s\n' "$dest" >&2
+      return 1
+    fi
     return
   else
     ln -s -- "$source" "$dest"
@@ -115,6 +126,10 @@ install_gegl() {
     rm -- "$dest"    # Only our own symlink, verified above.
     mv -- "$stage" "$dest"
     printf '%s\n' "$source" > "$marker"
+    if ! sandbox_can_read "$dest" no; then
+      printf 'FEHLER: GEGL-Kopie im Flatpak nicht erreichbar: %s\n' "$dest" >&2
+      return 1
+    fi
   fi
 }
 
@@ -128,4 +143,5 @@ for source in "$OUT/gegl"/nanotank-*.so; do
   install_gegl "$source" "$GEGL_PLUGINS/$(basename -- "$source")"
 done
 printf '\nInstallation fertig. GIMP komplett neu starten.\n'
-printf 'Bei Änderungen: bash scripts/build.sh && bash scripts/install-flatpak.sh\n'
+printf 'Bei direkter GIMP-Suchpfad-Konfiguration reicht bash scripts/build.sh.\n'
+printf 'Bei Verwendung der alternativen Kopierinstallation: bash scripts/install-flatpak.sh\n'
