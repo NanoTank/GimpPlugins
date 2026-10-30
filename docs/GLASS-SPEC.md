@@ -57,6 +57,14 @@ GIMP **vollständig schließen**, dann:
 Wenn der Branch lokal noch nicht vorhanden ist, einmalig zuvor:
     git switch -c feature/nanotank-glass --track origin/feature/nanotank-glass
 
+Hinweis zum automatischen Deployment: Der Flatpak-SDK-Build startet eine
+kurzlebige Sandbox mit der App-ID `org.gimp.GIMP`. `flatpak ps` kann sie noch
+kurz als aktiv melden, auch wenn kein GIMP-Fenster geöffnet ist. Das
+Deployment-Skript wartet bei einer gemeldeten Instanz daher höchstens rund
+3 Sekunden und prüft erneut. Bei dauerhaft aktiver Instanz wird weiterhin
+**nicht** installiert; die Instanzen werden zur Diagnose ausgegeben.
+Ein späterer manueller Aufruf des Deploy-Skripts ist dann möglich.
+
 GIMP neu starten und auf einer **Testkopie** Filter → NanoTank → Glass ausführen. Native C-Module können GIMP bei Fehlern beenden.
 
 ## Manuelle Abnahme-Checkliste
