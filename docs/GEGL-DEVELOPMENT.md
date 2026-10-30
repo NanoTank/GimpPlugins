@@ -20,7 +20,12 @@ bash scripts/diagnose-gegl-sdk.sh
 
 Die Ausgabe dokumentiert Compiler, Pfade, Bibliotheken und
 Entwicklerdateien direkt innerhalb der installierten GIMP-Flatpak-SDK-Sandbox.
-Die neue Pfadkorrektur ist **noch nicht auf dem Zielrechner bestätigt**.
+Die SDK-Pfade sind auf dem Zielrechner inzwischen bestätigt (GEGL 0.4.72,
+`/app/lib/pkgconfig/gegl-0.4.pc`, `/app/include/gegl-0.4/gegl-op.h`).
+Der Compiler scheiterte danach daran, dass `gegl-op.h` die Quelldatei
+`nanotank-gegl-test.c` ein zweites Mal inkludiert, das eigene Quellverzeichnis
+aber noch nicht im Include-Suchpfad lag. `build-gegl.sh` setzt nun explizit
+`-I"$(dirname "$src")"`. **Dieser Fix ist noch nicht lokal getestet.**
 Kompilierung, Installation und Menüregistrierung bleiben getrennte Tests.
 
 **Wichtig:** Folgebefehle im Terminal mit `&&` verknüpfen, damit die

@@ -23,6 +23,9 @@
 - `scripts/install-flatpak.sh` ist idempotent und überschreibt keine fremden Installationen.
 - Fehler nicht durch Löschen der bestehenden GIMP-Konfiguration kaschieren.
 - Kein automatischer Merge, Release oder Eingriff in andere Plug-ins ohne Abnahme.
+- GitHub ist primär Austausch- und Versionsspeicher für Nutzer, Codex und ChatGPT.
+- **Keine automatischen GitHub-Actions-Pipelines** bei Push, Pull Requests oder kleinen Änderungen. Builds und Regressionen lokal auf dem Entwicklerrechner bzw. in Codex, bei Bedarf gezielt manuell.
+- CI-/Workflow-Dateien in `.github/workflows/` nur nach vorheriger ausdrücklicher Freigabe des Nutzers; keine automatischen Releases oder Artefakt-Uploads.
 
 ## Definition of Done pro Filter
 

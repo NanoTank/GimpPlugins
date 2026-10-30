@@ -63,11 +63,15 @@ flatpak run --devel --command=sh org.gimp.GIMP -c '
   printf "GEGL Buildversion: "
   pkg-config --modversion gegl-0.4
   printf "SDK-Pfad: %s, Operationsheader: %s\n" "$pcdir" "$header"
+  # gegl-op.h inkludiert GEGL_OP_C_SOURCE nochmals: auch das eigene
+  # Quellverzeichnis muss deshalb im Include-Suchpfad stehen.
+  # -isystem vermindert unnoetige Warnungen aus GEGL-SDK-Headers.
   # pkg-config liefert eine Liste einzelner Compiler-/Linker-Flags.
   # In diesem eng kontrollierten SDK sind die Flags ohne Leerzeichen.
   # shellcheck disable=SC2086
   cc -std=c11 -O2 -fPIC -shared -Wall -Wextra \
-     -I"$(dirname -- "$header")" \
+     -I"$(dirname -- "$src")" \
+     -isystem "$(dirname -- "$header")" \
      $(pkg-config --cflags gegl-0.4) "$src" \
      -o "$out.tmp" $(pkg-config --libs gegl-0.4)
   mv -f -- "$out.tmp" "$out"
