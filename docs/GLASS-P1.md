@@ -1,7 +1,8 @@
 # NanoTank Glass P1 – Teststand und Übergabe
 
 Stand: 31.10.2026. Entwicklung ausschließlich `feature/nanotank-glass`.
-Noch keine visuelle Nutzerabnahme und keine Produktionsfreigabe.
+P1 wurde inzwischen vom Nutzer im GIMP getestet, visuell jedoch nicht abgenommen.
+Aktueller Folgestand: [GLASS-P1.1.md](GLASS-P1.1.md). Die folgenden Angaben dokumentieren die P1-Übergabe.
 
 ## Vergleich und Integration
 
