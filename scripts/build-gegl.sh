@@ -11,10 +11,18 @@ case "$MODULE" in
   *) echo "Unbekanntes NanoTank-GEGL-Modul: $MODULE" >&2; exit 2 ;;
 esac
 SRC="$ROOT/gegl/$MODULE/$MODULE.c"
-OUT="$ROOT/output/gegl/$MODULE.so"
+# Isoliertes Testziel, ohne ein eventuell geladenes Installationsmodul zu ersetzen.
+BUILD_DIR="${NANOTANK_GEGL_BUILD_DIR:-$ROOT/output/gegl}"
+OUT="$BUILD_DIR/$MODULE.so"
 
 command -v flatpak >/dev/null || { echo "FEHLER: flatpak fehlt" >&2; exit 1; }
 [[ -f "$SRC" ]] || { echo "FEHLER: Quelle fehlt: $SRC" >&2; exit 1; }
+if [[ "$MODULE" == nanotank-glass && "$BUILD_DIR" == "$ROOT/output/gegl" ]]; then
+  if flatpak ps --columns=application 2>/dev/null | grep -Fxq org.gimp.GIMP; then
+    echo "FEHLER: GIMP vollständig schließen, bevor das Glass-Buildziel ersetzt wird." >&2
+    exit 1
+  fi
+fi
 mkdir -p -- "$(dirname -- "$OUT")"
 
 # --devel wechselt die App-Laufzeit auf das zu GIMP passende GNOME-SDK.
@@ -86,5 +94,9 @@ flatpak run --devel --command=sh org.gimp.GIMP -c '
   printf "GEGL-Modul gebaut: %s\n" "$out"
 ' sh "$SRC" "$OUT"
 
-printf '\nBuild erfolgreich. GIMP vollständig schließen und danach ausführen:\n' 
-printf 'bash scripts/deploy-gegl-flatpak.sh && bash scripts/diagnose-gegl-flatpak.sh\n'
+if [[ "$BUILD_DIR" == "$ROOT/output/gegl" ]]; then
+  printf '\nBuild erfolgreich. GIMP geschlossen lassen, dann:\n'
+  printf 'bash scripts/deploy-gegl-flatpak.sh %s && bash scripts/diagnose-gegl-flatpak.sh %s\n' "$MODULE" "$MODULE"
+else
+  printf '\nIsolierter Testbuild: %s (installiertes Modul unverändert).\n' "$OUT"
+fi
