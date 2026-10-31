@@ -33,3 +33,10 @@ einen opaken Untergrund transparent machen.
   prüfen, dann minimalen Prototyp für Nutzerabnahme erstellen.
 
 **Hier nur die Basis; Umsetzung in einem eigenen Feature-Branch/Chat.**
+
+## Verbindliche Produktpräzisierung
+
+Universeller nativer 2D-/2,5D-Materialfilter, kein Glasbutton-Generator und kein
+3D-Renderer. Buttons sind Testmotive. Glasauflage und spätere Materialumwandlung
+sind unterschiedliche Konzepte. Maskenbasierte Profile sollen langfristig
+auswählbar sein. Siehe [GLASS-MATERIAL-VISION.md](GLASS-MATERIAL-VISION.md).

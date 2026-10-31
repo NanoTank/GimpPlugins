@@ -2,7 +2,8 @@
 
 Stand: 31.10.2026. Branch: `feature/nanotank-glass`.
 P1 wurde vom Nutzer in GIMP technisch geprüft, **visuell nicht abgenommen**.
-Auch P1.1 benötigt die visuelle Nutzerabnahme. Keine Folgephase, kein Merge.
+P1.1 wurde inzwischen manuell geprüft: Durchsicht verbessert, Materialwirkung zu schwach.
+Visuell nicht abgenommen. Folgestand: [GLASS-P1.2.md](GLASS-P1.2.md).
 
 ## Ursache des Schleiers
 
