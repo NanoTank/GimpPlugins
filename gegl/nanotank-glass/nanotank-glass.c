@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 /*
- * NanoTank Glass P1.2 - native GIMP/GEGL layer filter.
+ * NanoTank Glass P1.3 - native GIMP/GEGL layer filter.
  *
  * 2D thin-surface approximation, NOT a 3D ray tracer.  "Brechung" samples
  * this operation's own input buffer.  GIMP does not hand the operation the
@@ -10,13 +10,13 @@
 #ifdef GEGL_PROPERTIES
 
 property_double (thickness, "Glasdicke (Pixel)", 12.0)
-  description ("Breite der Licht- und Schattenzone entlang der Glaskante")
+  description ("Altmodus: Randbreite. Pixelhöhenprofil: positive Mindestdicke für die interne Brechung.")
   value_range (1.0, 64.0)
   ui_range    (1.0, 48.0)
   ui_steps    (1.0, 5.0)
 
-property_double (roundness, "Kantenwölbung", 0.65)
-  description ("Rundet das optische Kantenprofil; verändert nicht die Auswahlkontur")
+property_double (roundness, "Kantenwölbung (Altmodus)", 0.65)
+  description ("Nur Altmodus: optisches Randprofil; im Pixelprofil stattdessen Kantenrundung verwenden")
   value_range (0.0, 1.0)
   ui_steps    (0.01, 0.10)
 
@@ -51,10 +51,29 @@ property_double (refraction, "Interne Lichtbrechung (Pixel)", 2.5)
   value_range (0.0, 10.0)
   ui_steps    (0.1, 1.0)
 
-property_double (curvature, "Wölbung", 0.30)
+property_double (curvature, "Wölbung (Altmodus)", 0.30)
   description ("Krümmung der Oberfläche: verändert Normalen, Reflexionen und interne Brechung")
   value_range (-1.0, 1.0)
   ui_steps    (0.01, 0.10)
+
+property_boolean (pixel_geometry, "Pixelhöhenprofil verwenden", FALSE)
+  description ("Ein: geometrische Höhe, Bereich und Kantenrundung. Aus: bisherige Einstellungen unverändert berechnen.")
+
+property_double (surface_height, "Wölbungshöhe (Pixel)", 10.0)
+  description ("Nur Pixelhöhenprofil: positiv konvex, negativ konkav; unabhängig von Glasdicke")
+  value_range (-1000.0, 1000.0)
+  ui_range (-100.0, 150.0)
+  ui_steps (1.0, 10.0)
+
+property_double (surface_extent, "Wölbungsbereich (%)", 100.0)
+  description ("Nur Pixelhöhenprofil: 100 bis zur Mitte, kleinere Werte mit ebener Mitte")
+  value_range (1.0, 100.0)
+  ui_steps (1.0, 10.0)
+
+property_double (edge_radius, "Kantenrundung (Pixel)", 4.0)
+  description ("Nur Pixelhöhenprofil: unabhängiger Außenrand; 0 für reine Linse/Halbkugel")
+  value_range (0.0, 64.0)
+  ui_steps (0.5, 5.0)
 
 property_double (ior, "Brechungsindex", 1.50)
   description ("Beeinflusst Fresnel-Reflexion und interne Brechung; Glas etwa 1,5")
@@ -75,6 +94,7 @@ property_boolean (alpha_shape, "Glasform aus Ebenen-Alpha", FALSE)
 
 #include "gegl-op.h"
 #include <math.h>
+#include "glass-geometry.h"
 
 static inline gfloat
 nt_clamp (gfloat x, gfloat lo, gfloat hi)
@@ -256,7 +276,7 @@ process (GeglOperation       *operation,
   GeglOperationAreaFilter *area = GEGL_OPERATION_AREA_FILTER (operation);
   GeglRectangle read_rect, shape;
   NtTile tile;
-  gfloat *src, *dst, *distance, *height, *scratch;
+  gfloat *src, *dst, *distance, *height, *scratch, *geo_x = NULL, *geo_y = NULL;
   gfloat tint[4] = {0.74f, 0.87f, 0.97f, 1.0f};
   gsize in_pixels, out_pixels;
   gint x, y, pad;
@@ -286,8 +306,8 @@ process (GeglOperation       *operation,
   dst = g_try_new (gfloat, out_pixels * 4);
   distance = g_try_new (gfloat, in_pixels);
   height = g_try_new (gfloat, in_pixels);
-  scratch = g_try_new (gfloat, in_pixels);
-  if (!src || !dst || !distance || !height || !scratch)
+  scratch = o->pixel_geometry ? NULL : g_try_new (gfloat, in_pixels);
+  if (!src || !dst || !distance || !height || (!o->pixel_geometry && !scratch))
     {
       g_free (src);
       g_free (dst);
@@ -302,65 +322,88 @@ process (GeglOperation       *operation,
   tile.pixels = src;
   tile.rect = read_rect;
 
-  shape = *bounds;
-  if (o->alpha_shape)
+  gfloat bevel = 1.0f;
+  if (!o->pixel_geometry)
     {
-      gint x0 = bounds->x + bounds->width, y0 = bounds->y + bounds->height;
-      gint x1 = bounds->x, y1 = bounds->y;
-      for (y = bounds->y; y < bounds->y + bounds->height; y++)
-        for (x = bounds->x; x < bounds->x + bounds->width; x++)
-          {
-            const gfloat *px = nt_pixel (&tile, x, y);
-            if (px && px[3] > 0.01f)
-              {
-                x0 = MIN (x0, x); y0 = MIN (y0, y);
-                x1 = MAX (x1, x + 1); y1 = MAX (y1, y + 1);
-              }
-          }
-      if (x1 > x0 && y1 > y0)
-        shape = (GeglRectangle) { x0, y0, x1 - x0, y1 - y0 };
-    }
-  /* Soft saturation leaves a clear centre even for small objects, while
-   * retaining visible differences between 4, 12, 20 and 30 px. */
-  gfloat limit = MAX (1.0f, MIN (shape.width, shape.height) * 0.40f);
-  gfloat bevel = limit * (1.0f - expf (-o->thickness / limit));
-
-  /* Full chamfer distance to the silhouette. Fractional alpha seeds locate
-   * antialiased contours. Global height smoothing also uses the interior. */
-  for (y = 0; y < read_rect.height; y++)
-    for (x = 0; x < read_rect.width; x++)
-      {
-        gfloat mask = nt_mask (&tile, bounds, read_rect.x + x,
-                               read_rect.y + y, o->alpha_shape);
-        distance[(gsize)y * read_rect.width + x] =
-          mask < 0.999f ? mask : MAX (shape.width, shape.height) + 2.0f;
-      }
-  for (gint pass = 0; pass < 2; pass++)
-    for (gint yy = 0; yy < read_rect.height; yy++)
-      for (gint xx = 0; xx < read_rect.width; xx++)
+      shape = *bounds;
+      if (o->alpha_shape)
         {
-          gint step = pass ? -1 : 1;
-          x = pass ? read_rect.width - 1 - xx : xx;
-          y = pass ? read_rect.height - 1 - yy : yy;
-          gsize idx = (gsize)y * read_rect.width + x;
-          for (gint dy = -1; dy <= 0; dy++)
-            for (gint dx = -1; dx <= 1; dx++)
+          gint x0 = bounds->x + bounds->width, y0 = bounds->y + bounds->height;
+          gint x1 = bounds->x, y1 = bounds->y;
+          for (y = bounds->y; y < bounds->y + bounds->height; y++)
+            for (x = bounds->x; x < bounds->x + bounds->width; x++)
               {
-                if (dy == 0 && dx != -1) continue;
-                gint sx = x + dx * step, sy = y + dy * step;
-                if (sx >= 0 && sy >= 0 && sx < read_rect.width && sy < read_rect.height)
-                  distance[idx] = fminf (distance[idx],
-                    distance[(gsize)sy * read_rect.width + sx] +
-                    (dx && dy ? 1.41421356f : 1.0f));
+                const gfloat *px = nt_pixel (&tile, x, y);
+                if (px && px[3] > 0.01f)
+                  {
+                    x0 = MIN (x0, x); y0 = MIN (y0, y);
+                    x1 = MAX (x1, x + 1); y1 = MAX (y1, y + 1);
+                  }
               }
+          if (x1 > x0 && y1 > y0)
+            shape = (GeglRectangle) { x0, y0, x1 - x0, y1 - y0 };
         }
+      /* Soft saturation leaves a clear centre even for small objects, while
+       * retaining visible differences between 4, 12, 20 and 30 px. */
+      gfloat limit = MAX (1.0f, MIN (shape.width, shape.height) * 0.40f);
+      bevel = limit * (1.0f - expf (-o->thickness / limit));
 
-  /* A generic contour-derived cap, softened at medial ridges. The same
-   * scalar surface is used for rectangles, circles and organic silhouettes. */
-  gfloat scale = MAX (1.0f, MIN (shape.width, shape.height) * 0.5f);
-  gint smoothing = MAX (1, (gint) ceil (scale * 0.30f));
-  nt_smooth_height (distance, scratch, height, read_rect.width,
-                    read_rect.height, smoothing, scale);
+      /* Full chamfer distance to the silhouette. Fractional alpha seeds locate
+       * antialiased contours. Global height smoothing also uses the interior. */
+      for (y = 0; y < read_rect.height; y++)
+        for (x = 0; x < read_rect.width; x++)
+          {
+            gfloat mask = nt_mask (&tile, bounds, read_rect.x + x,
+                                   read_rect.y + y, o->alpha_shape);
+            distance[(gsize)y * read_rect.width + x] =
+              mask < 0.999f ? mask : MAX (shape.width, shape.height) + 2.0f;
+          }
+      for (gint pass = 0; pass < 2; pass++)
+        for (gint yy = 0; yy < read_rect.height; yy++)
+          for (gint xx = 0; xx < read_rect.width; xx++)
+            {
+              gint step = pass ? -1 : 1;
+              x = pass ? read_rect.width - 1 - xx : xx;
+              y = pass ? read_rect.height - 1 - yy : yy;
+              gsize idx = (gsize)y * read_rect.width + x;
+              for (gint dy = -1; dy <= 0; dy++)
+                for (gint dx = -1; dx <= 1; dx++)
+                  {
+                    if (dy == 0 && dx != -1) continue;
+                    gint sx = x + dx * step, sy = y + dy * step;
+                    if (sx >= 0 && sy >= 0 && sx < read_rect.width && sy < read_rect.height)
+                      distance[idx] = fminf (distance[idx],
+                        distance[(gsize)sy * read_rect.width + sx] +
+                        (dx && dy ? 1.41421356f : 1.0f));
+                  }
+            }
+
+      /* A generic contour-derived cap, softened at medial ridges. The same
+       * scalar surface is used for rectangles, circles and organic silhouettes. */
+      gfloat scale = MAX (1.0f, MIN (shape.width, shape.height) * 0.5f);
+      gint smoothing = MAX (1, (gint) ceil (scale * 0.30f));
+      nt_smooth_height (distance, scratch, height, read_rect.width,
+                        read_rect.height, smoothing, scale);
+
+    }
+  if (o->pixel_geometry)
+    {
+      geo_x = g_try_new (gfloat, in_pixels);
+      geo_y = g_try_new (gfloat, in_pixels);
+      for (y = 0; y < read_rect.height; y++)
+        for (x = 0; x < read_rect.width; x++)
+          distance[(gsize)y * read_rect.width + x] =
+            nt_mask (&tile, bounds, read_rect.x+x, read_rect.y+y, o->alpha_shape);
+      if (!geo_x || !geo_y || !nt_geometry_build (distance, read_rect.width,
+           read_rect.height, o->surface_height, o->surface_extent, o->edge_radius,
+           o->thickness, height, geo_x, geo_y, distance, NULL))
+        {
+          g_warning ("NanoTank Glass: Pixelgeometrie konnte nicht berechnet werden (Speicher oder Konvergenz).");
+          g_free(src); g_free(dst); g_free(distance); g_free(height);
+          g_free(scratch); g_free(geo_x); g_free(geo_y);
+          return FALSE;
+        }
+    }
 
   if (o->tint)
     gegl_color_get_pixel (o->tint, format, tint);
@@ -371,20 +414,6 @@ process (GeglOperation       *operation,
         const gfloat *center = nt_pixel (&tile, x, y);
         gfloat *out = dst + ((gsize) (y - roi->y) * roi->width + (x - roi->x)) * 4;
         gsize di = (gsize)(y - read_rect.y) * read_rect.width + x - read_rect.x;
-        gfloat d = distance[di];
-        gint stride = read_rect.width;
-        /* Sobel derivative suppresses lattice-direction noise on circles. */
-        gfloat gx = (2.0f * (distance[di + 1] - distance[di - 1]) +
-                     distance[di + stride + 1] - distance[di + stride - 1] +
-                     distance[di - stride + 1] - distance[di - stride - 1]) * 0.125f;
-        gfloat gy = (2.0f * (distance[di + stride] - distance[di - stride]) +
-                     distance[di + stride + 1] - distance[di - stride + 1] +
-                     distance[di + stride - 1] - distance[di - stride - 1]) * 0.125f;
-        gfloat edge = nt_clamp (1.0f - d / bevel, 0.0f, 1.0f);
-        gfloat slope;
-        gfloat magnitude = hypotf (gx, gy);
-        gfloat nx = magnitude > 1e-6f ? -gx / magnitude : 0.0f;
-        gfloat ny = magnitude > 1e-6f ? -gy / magnitude : 0.0f;
         gfloat refracted[4], f0, fresnel, surface, fill;
         gfloat dx, dy;
         gint k;
@@ -397,15 +426,35 @@ process (GeglOperation       *operation,
             continue;
           }
 
-        /* A rounded cap rises from the contour into a shallow ellipsoidal
-         * dome. Its derivative tends smoothly to zero at the bevel join.
-         * Both cap and dome follow the actual contour, not a bounding ellipse. */
-        gfloat t = nt_clamp (d / bevel, 0.025f, 1.0f);
-        gfloat cap = (1.0f - t) / sqrtf (fmaxf (0.02f, t * (2.0f - t)));
-        slope = (0.4f + 1.8f * o->roundness) * cap;
-        gfloat dome = 2.8f * o->curvature;
-        gfloat sx = nx * slope - (height[di + 1] - height[di - 1]) * 0.5f * dome;
-        gfloat sy = ny * slope - (height[di + stride] - height[di - stride]) * 0.5f * dome;
+        gfloat sx, sy, edge=0.0f;
+        if (o->pixel_geometry)
+          { sx=geo_x[di]; sy=geo_y[di]; }
+        else
+          {
+            gfloat d = distance[di];
+            gint stride = read_rect.width;
+            /* Sobel derivative suppresses lattice-direction noise on circles. */
+            gfloat gx = (2.0f * (distance[di + 1] - distance[di - 1]) +
+                         distance[di + stride + 1] - distance[di + stride - 1] +
+                         distance[di - stride + 1] - distance[di - stride - 1]) * 0.125f;
+            gfloat gy = (2.0f * (distance[di + stride] - distance[di - stride]) +
+                         distance[di + stride + 1] - distance[di - stride + 1] +
+                         distance[di + stride - 1] - distance[di - stride - 1]) * 0.125f;
+            edge = nt_clamp (1.0f - d / bevel, 0.0f, 1.0f);
+            gfloat slope;
+            gfloat magnitude = hypotf (gx, gy);
+            gfloat nx = magnitude > 1e-6f ? -gx / magnitude : 0.0f;
+            gfloat ny = magnitude > 1e-6f ? -gy / magnitude : 0.0f;
+            /* A rounded cap rises from the contour into a shallow ellipsoidal
+             * dome. Its derivative tends smoothly to zero at the bevel join.
+             * Both cap and dome follow the actual contour, not a bounding ellipse. */
+            gfloat t = nt_clamp (d / bevel, 0.025f, 1.0f);
+            gfloat cap = (1.0f - t) / sqrtf (fmaxf (0.02f, t * (2.0f - t)));
+            slope = (0.4f + 1.8f * o->roundness) * cap;
+            gfloat dome = 2.8f * o->curvature;
+            sx = nx * slope - (height[di + 1] - height[di - 1]) * 0.5f * dome;
+            sy = ny * slope - (height[di + stride] - height[di - stride]) * 0.5f * dome;
+          }
         gfloat nz = 1.0f / sqrtf (1.0f + sx*sx + sy*sy);
         gfloat normal_x = sx * nz, normal_y = sy * nz;
 
@@ -413,6 +462,8 @@ process (GeglOperation       *operation,
          * same normals drive lighting and displacement; thickness matters. */
         gfloat optical = (1.0f - 1.0f / o->ior);
         gfloat travel = o->refraction * (0.35f + 0.65f * o->thickness / 12.0f);
+        if (o->pixel_geometry)
+          travel = o->refraction * (0.35f + 0.65f * distance[di] / 12.0f);
         travel = fminf (travel, o->refraction + o->thickness * 0.25f);
         dx = -normal_x * optical * travel;
         dy = -normal_y * optical * travel;
@@ -441,12 +492,24 @@ process (GeglOperation       *operation,
                              powf (across / 0.85f, 4.0f));
         /* Finite radiance compressed to a display-referred reflection
          * coverage. This keeps RGB/alpha energy coupled without clipping. */
-        gfloat lamps = o->highlights * (28.0f * window + 5.0f * card);
+        if (o->pixel_geometry)
+          {
+            /* Gaussian angular softboxes avoid the sharp superellipse
+             * shoulders of the legacy environment. No image-space paint. */
+            window = expf (-0.5f * powf ((along-0.64f)/0.22f, 2.0f) -
+                           0.5f * powf (across/0.65f, 2.0f));
+            window *= nt_clamp ((rz+0.15f)*4.0f, 0.0f, 1.0f);
+            card = expf (-0.5f * powf ((along+0.72f)/0.20f, 2.0f) -
+                         0.5f * powf (across/0.70f, 2.0f));
+          }
+        gfloat lamps = o->highlights * (o->pixel_geometry
+                      ? (9.0f * window + 1.8f * card)
+                      : (28.0f * window + 5.0f * card));
         /* The low room exposure at the centre is unchanged. Steep
          * surfaces reflect a darker room with greater coverage, yielding
          * a readable opposite edge on bright backgrounds. */
         gfloat grazing = powf (1.0f - nz, 0.65f);
-        gfloat room = 0.35f + 5.0f * grazing;
+        gfloat room = 0.35f + (o->pixel_geometry ? 1.5f : 5.0f) * grazing;
         gfloat radiance = room + lamps;
         gfloat environment = (0.035f + lamps) / radiance;
         surface = 1.0f - expf (-o->reflection * fresnel * radiance);
@@ -487,6 +550,8 @@ process (GeglOperation       *operation,
   g_free (distance);
   g_free (height);
   g_free (scratch);
+  g_free (geo_x);
+  g_free (geo_y);
   return TRUE;
 }
 
