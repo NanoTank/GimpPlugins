@@ -3,7 +3,13 @@
 Branch `feature/nanotank-glass`, Entwickler NanoTank.
 P1.4 wurde vom Nutzer **im Grundsatz visuell positiv abgenommen**, einschließlich
 des Snapshot-Workflows als vertretbarem Zwischenstand. Das ist keine endgültige
-Workflow-/Produktionsfreigabe. P1.4.1 wartet auf erneute visuelle Abnahme.
+Workflow-/Produktionsfreigabe.
+
+**Aktueller Status:** P1.4.1 wurde anhand der drei tatsächlichen GEGL-Vergleichsbilder
+in ChatGPT visuell positiv bewertet und ist der **aktuelle stabile
+Entwicklungszwischenstand**. Die lokale Mehrfachabtastung und die Standardtönung
+0,12 sind akzeptiert. Diese Bewertung ersetzt noch nicht den praktischen
+Benutzertest mit echten Bildern und interaktivem GIMP-Dialog.
 
 ## Zwei gezielte Änderungen
 
@@ -100,9 +106,16 @@ in allen sechs Motiven einschließlich Auflage **pixelidentische Referenz-PNGs**
 
 Eine neue manuelle GIMP-Dialog-/GUI-Undo-Abnahme wird nicht behauptet. Der
 XCF-Test betrifft weiterhin das gerasterte Snapshot-Ergebnis, keinen editierbaren
-Aux-Effekt. Die erneute visuelle Nutzerabnahme bleibt offen.
+Aux-Effekt. Die bildbasierte visuelle Bewertung ist positiv; die praktische
+Benutzerprüfung mit echten Bildern und interaktivem GIMP-Dialog steht noch aus.
 
 ## Verbleibende Grenzen
+
+Aus der visuellen Rückmeldung bleiben insbesondere kleine harte Übergänge bzw.
+Randartefakte bei stark gewölbten und organischen Formen sowie der noch
+zurückhaltende räumliche Eindruck konkaver Flächen offen. Diese Punkte lösen
+jetzt keine weitere Optimierungsphase aus.
+
 
 Unverändert gelten die Grenzen aus [GLASS-P1.4.md](GLASS-P1.4.md): Vorderfläche zur
 Referenzebene statt massiver Körper mit Rückseite, feste Studio-Umgebung,
@@ -134,4 +147,5 @@ weiterhin zum Ausgangsbild zurückkehren. Alte Snapshot-Bilder behalten ihre
 Pixel unverändert; neue Ergebnisse sind als P1.4.1 gekennzeichnet.
 
 Keine neue Workflow-Architektur, Regler, Reliefs, Auswahlhelfer, Rauheit, CI oder
-Folgephase. Nach Push auf visuelle Rückmeldung warten.
+Folgephase. Nächster Schritt ist ausschließlich die praktische Benutzerprüfung
+in GIMP. Bis zu deren Rückmeldung keine neue Optimierungsphase beginnen.

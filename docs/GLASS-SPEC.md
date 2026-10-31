@@ -1,6 +1,6 @@
 # NanoTank Glass — Spezifikation P0
 
-**Branch:** `feature/nanotank-glass`. **Status:** P1.4 im Grundsatz visuell positiv abgenommen, Snapshot als Zwischenstand akzeptiert. P1.4.1 ist gezielter optischer Feinschliff zur erneuten Abnahme.
+**Branch:** `feature/nanotank-glass`. **Status:** P1.4 im Grundsatz visuell positiv abgenommen, Snapshot als Zwischenstand akzeptiert. P1.4.1 ist anhand der tatsächlichen Vergleichsbilder positiv bewertet und aktueller stabiler Entwicklungszwischenstand. Praktische Benutzerprüfung mit echten Bildern im interaktiven GIMP-Dialog steht aus.
 
 Aktueller verbindlicher Stand: [GLASS-P1.4.1.md](GLASS-P1.4.1.md).
 Langfristige 2D-/2,5D-Materialvision: [GLASS-MATERIAL-VISION.md](GLASS-MATERIAL-VISION.md).

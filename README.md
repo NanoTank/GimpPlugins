@@ -132,7 +132,9 @@ Siehe [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 Glass-Anforderungen: [docs/GLASS-BRIEF.md](docs/GLASS-BRIEF.md).
 Aktueller Glass-Teststand mit echter Hintergrundbrechung als neuem Snapshot-Bild:
 [docs/GLASS-P1.4.1.md](docs/GLASS-P1.4.1.md). P1.4 ist grundsätzlich positiv abgenommen;
-P1.4.1 verfeinert Abtastung und Starttönung. Der bisherige Glass-Ebenenfilter bleibt erhalten.
+P1.4.1 ist bildbasiert positiv bewertet und aktueller stabiler Entwicklungszwischenstand.
+Der Praxistest mit echten Bildern im interaktiven GIMP-Dialog steht noch aus.
+Der bisherige Glass-Ebenenfilter bleibt erhalten.
 
 **Status (30.10.2026):** Python-Menüintegration und tatsächlicher Aufruf des
 Systemtests in GIMP 3.2.6 Flatpak auf Kubuntu vom Nutzer erfolgreich abgenommen.
