@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 /*
- * NanoTank Glass P1.1 - native GIMP/GEGL layer filter.
+ * NanoTank Glass P1.2 - native GIMP/GEGL layer filter.
  *
  * 2D thin-surface approximation, NOT a 3D ray tracer.  "Brechung" samples
  * this operation's own input buffer.  GIMP does not hand the operation the
@@ -164,6 +164,70 @@ get_bounding_box (GeglOperation *operation)
   return source ? *source : empty;
 }
 
+/* Contour extent and the smoothed distance surface are global geometry
+ * dependencies. Cache the full layer; no mutable geometry cache in process. */
+static GeglRectangle
+get_required_for_output (GeglOperation *operation, const gchar *pad,
+                         const GeglRectangle *roi)
+{
+  (void) pad; (void) roi;
+  return get_bounding_box (operation);
+}
+
+static GeglRectangle
+get_cached_region (GeglOperation *operation, const GeglRectangle *roi)
+{
+  (void) roi;
+  return get_bounding_box (operation);
+}
+
+static GeglRectangle
+get_invalidated_by_change (GeglOperation *operation, const gchar *pad,
+                            const GeglRectangle *changed)
+{
+  GeglRectangle full = get_bounding_box (operation);
+  (void) pad;
+  /* A tiny contour edit can alter the extent and normals throughout the
+   * object. Include old bounds if an upstream extent is shrinking. */
+  gegl_rectangle_bounding_box (&full, &full, changed);
+  return full;
+}
+
+/* Separable box smoothing of the distance-derived height. Outside the full
+ * input extent the distance is zero; the denominator stays constant there. */
+static void
+nt_smooth_height (const gfloat *distance, gfloat *scratch, gfloat *height,
+                  gint width, gint rows, gint radius, gfloat scale)
+{
+  for (gsize i = 0; i < (gsize) width * rows; i++)
+    {
+      gfloat q = nt_clamp (distance[i] / scale, 0.0f, 1.0f);
+      height[i] = scale * sqrtf (q * (2.0f - q));
+    }
+  for (gint y = 0; y < rows; y++)
+    {
+      gfloat sum = 0.0f;
+      for (gint x = 0; x <= MIN (radius, width - 1); x++) sum += height[(gsize)y * width + x];
+      for (gint x = 0; x < width; x++)
+        {
+          scratch[(gsize)y * width + x] = sum / (2 * radius + 1);
+          if (x - radius >= 0) sum -= height[(gsize)y * width + x - radius];
+          if (x + radius + 1 < width) sum += height[(gsize)y * width + x + radius + 1];
+        }
+    }
+  for (gint x = 0; x < width; x++)
+    {
+      gfloat sum = 0.0f;
+      for (gint y = 0; y <= MIN (radius, rows - 1); y++) sum += scratch[(gsize)y * width + x];
+      for (gint y = 0; y < rows; y++)
+        {
+          height[(gsize)y * width + x] = sum / (2 * radius + 1);
+          if (y - radius >= 0) sum -= scratch[(gsize)(y - radius) * width + x];
+          if (y + radius + 1 < rows) sum += scratch[(gsize)(y + radius + 1) * width + x];
+        }
+    }
+}
+
 static void
 prepare (GeglOperation *operation)
 {
@@ -190,9 +254,9 @@ process (GeglOperation       *operation,
     gegl_operation_source_get_bounding_box (operation, "input");
   const Babl *format = gegl_operation_get_format (operation, "output");
   GeglOperationAreaFilter *area = GEGL_OPERATION_AREA_FILTER (operation);
-  GeglRectangle read_rect;
+  GeglRectangle read_rect, shape;
   NtTile tile;
-  gfloat *src, *dst, *distance;
+  gfloat *src, *dst, *distance, *height, *scratch;
   gfloat tint[4] = {0.74f, 0.87f, 0.97f, 1.0f};
   gsize in_pixels, out_pixels;
   gint x, y, pad;
@@ -221,11 +285,15 @@ process (GeglOperation       *operation,
   src = g_try_new (gfloat, in_pixels * 4);
   dst = g_try_new (gfloat, out_pixels * 4);
   distance = g_try_new (gfloat, in_pixels);
-  if (!src || !dst || !distance)
+  height = g_try_new (gfloat, in_pixels);
+  scratch = g_try_new (gfloat, in_pixels);
+  if (!src || !dst || !distance || !height || !scratch)
     {
       g_free (src);
       g_free (dst);
       g_free (distance);
+      g_free (height);
+      g_free (scratch);
       return FALSE;
     }
 
@@ -234,16 +302,38 @@ process (GeglOperation       *operation,
   tile.pixels = src;
   tile.rect = read_rect;
 
-  /* Bounded chamfer distance to the silhouette. Padding exceeds the bevel
-   * support, so independently rendered tiles produce the same local field.
-   * Fractional alpha seeds preserve the position of antialiased contours. */
+  shape = *bounds;
+  if (o->alpha_shape)
+    {
+      gint x0 = bounds->x + bounds->width, y0 = bounds->y + bounds->height;
+      gint x1 = bounds->x, y1 = bounds->y;
+      for (y = bounds->y; y < bounds->y + bounds->height; y++)
+        for (x = bounds->x; x < bounds->x + bounds->width; x++)
+          {
+            const gfloat *px = nt_pixel (&tile, x, y);
+            if (px && px[3] > 0.01f)
+              {
+                x0 = MIN (x0, x); y0 = MIN (y0, y);
+                x1 = MAX (x1, x + 1); y1 = MAX (y1, y + 1);
+              }
+          }
+      if (x1 > x0 && y1 > y0)
+        shape = (GeglRectangle) { x0, y0, x1 - x0, y1 - y0 };
+    }
+  /* Soft saturation leaves a clear centre even for small objects, while
+   * retaining visible differences between 4, 12, 20 and 30 px. */
+  gfloat limit = MAX (1.0f, MIN (shape.width, shape.height) * 0.40f);
+  gfloat bevel = limit * (1.0f - expf (-o->thickness / limit));
+
+  /* Full chamfer distance to the silhouette. Fractional alpha seeds locate
+   * antialiased contours. Global height smoothing also uses the interior. */
   for (y = 0; y < read_rect.height; y++)
     for (x = 0; x < read_rect.width; x++)
       {
         gfloat mask = nt_mask (&tile, bounds, read_rect.x + x,
                                read_rect.y + y, o->alpha_shape);
         distance[(gsize)y * read_rect.width + x] =
-          mask < 0.999f ? mask : o->thickness + 2.0f;
+          mask < 0.999f ? mask : MAX (shape.width, shape.height) + 2.0f;
       }
   for (gint pass = 0; pass < 2; pass++)
     for (gint yy = 0; yy < read_rect.height; yy++)
@@ -265,6 +355,13 @@ process (GeglOperation       *operation,
               }
         }
 
+  /* A generic contour-derived cap, softened at medial ridges. The same
+   * scalar surface is used for rectangles, circles and organic silhouettes. */
+  gfloat scale = MAX (1.0f, MIN (shape.width, shape.height) * 0.5f);
+  gint smoothing = MAX (1, (gint) ceil (scale * 0.30f));
+  nt_smooth_height (distance, scratch, height, read_rect.width,
+                    read_rect.height, smoothing, scale);
+
   if (o->tint)
     gegl_color_get_pixel (o->tint, format, tint);
 
@@ -283,13 +380,11 @@ process (GeglOperation       *operation,
         gfloat gy = (2.0f * (distance[di + stride] - distance[di - stride]) +
                      distance[di + stride + 1] - distance[di - stride + 1] +
                      distance[di + stride - 1] - distance[di - stride - 1]) * 0.125f;
-        gfloat edge = nt_clamp (1.0f - d / o->thickness, 0.0f, 1.0f);
+        gfloat edge = nt_clamp (1.0f - d / bevel, 0.0f, 1.0f);
         gfloat slope;
         gfloat magnitude = hypotf (gx, gy);
         gfloat nx = magnitude > 1e-6f ? -gx / magnitude : 0.0f;
         gfloat ny = magnitude > 1e-6f ? -gy / magnitude : 0.0f;
-        gfloat u = (x - bounds->x + 0.5f) / MAX (1, bounds->width);
-        gfloat v = (y - bounds->y + 0.5f) / MAX (1, bounds->height);
         gfloat refracted[4], f0, fresnel, surface, fill;
         gfloat dx, dy;
         gint k;
@@ -304,13 +399,13 @@ process (GeglOperation       *operation,
 
         /* A rounded cap rises from the contour into a shallow ellipsoidal
          * dome. Its derivative tends smoothly to zero at the bevel join.
-         * The dome uses layer coordinates; alpha contours supply the bevel. */
-        gfloat t = nt_clamp (d / o->thickness, 0.025f, 1.0f);
+         * Both cap and dome follow the actual contour, not a bounding ellipse. */
+        gfloat t = nt_clamp (d / bevel, 0.025f, 1.0f);
         gfloat cap = (1.0f - t) / sqrtf (fmaxf (0.02f, t * (2.0f - t)));
         slope = (0.4f + 1.8f * o->roundness) * cap;
         gfloat dome = 2.8f * o->curvature;
-        gfloat sx = nx * slope + (2.0f * u - 1.0f) * dome;
-        gfloat sy = ny * slope + (2.0f * v - 1.0f) * dome;
+        gfloat sx = nx * slope - (height[di + 1] - height[di - 1]) * 0.5f * dome;
+        gfloat sy = ny * slope - (height[di + stride] - height[di - stride]) * 0.5f * dome;
         gfloat nz = 1.0f / sqrtf (1.0f + sx*sx + sy*sy);
         gfloat normal_x = sx * nz, normal_y = sy * nz;
 
@@ -338,16 +433,21 @@ process (GeglOperation       *operation,
         gfloat rz = 2.0f * nz * nz - 1.0f;
         gfloat along = rx * light_x + ry * light_y;
         gfloat across = -rx * light_y + ry * light_x;
-        gfloat box_u = (along - 0.65f) / 0.25f;
-        gfloat box_v = across / 0.70f;
+        gfloat box_u = (along - 0.64f) / 0.22f;
+        gfloat box_v = across / 0.82f;
         gfloat window = expf (-powf (box_u, 4.0f) - powf (box_v, 4.0f));
         window *= nt_clamp ((rz + 0.15f) * 4.0f, 0.0f, 1.0f);
         gfloat card = expf (-powf ((along + 0.72f) / 0.18f, 2.0f) -
                              powf (across / 0.85f, 4.0f));
         /* Finite radiance compressed to a display-referred reflection
          * coverage. This keeps RGB/alpha energy coupled without clipping. */
-        gfloat lamps = o->highlights * (14.0f * window + 2.5f * card);
-        gfloat radiance = 0.35f + lamps;
+        gfloat lamps = o->highlights * (28.0f * window + 5.0f * card);
+        /* The low room exposure at the centre is unchanged. Steep
+         * surfaces reflect a darker room with greater coverage, yielding
+         * a readable opposite edge on bright backgrounds. */
+        gfloat grazing = powf (1.0f - nz, 0.65f);
+        gfloat room = 0.35f + 5.0f * grazing;
+        gfloat radiance = room + lamps;
         gfloat environment = (0.035f + lamps) / radiance;
         surface = 1.0f - expf (-o->reflection * fresnel * radiance);
 
@@ -385,6 +485,8 @@ process (GeglOperation       *operation,
   g_free (src);
   g_free (dst);
   g_free (distance);
+  g_free (height);
+  g_free (scratch);
   return TRUE;
 }
 
@@ -397,6 +499,10 @@ gegl_op_class_init (GeglOpClass *klass)
 
   operation_class->prepare = prepare;
   operation_class->get_bounding_box = get_bounding_box;
+  operation_class->get_required_for_output = get_required_for_output;
+  operation_class->get_cached_region = get_cached_region;
+  operation_class->get_invalidated_by_change = get_invalidated_by_change;
+  operation_class->threaded = FALSE;
   filter_class->process = process;
 
   gegl_operation_class_set_keys (operation_class,
