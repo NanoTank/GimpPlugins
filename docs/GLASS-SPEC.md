@@ -1,8 +1,8 @@
 # NanoTank Glass — Spezifikation P0
 
-**Stand:** 31.10.2026. **Branch:** `feature/nanotank-glass`. **Status:** P1 technisch im GIMP geprüft, visuell nicht abgenommen. P1.1 manuell geprüft, visuell nicht abgenommen. P1.2 technisch geprüft, visuell noch nicht abgenommen. P1.3-Pixelgeometrie im SDK gerendert; GIMP- und Nutzerabnahme offen.
+**Branch:** `feature/nanotank-glass`. **Status:** P1.3-Geometrie positiv beurteilt; Materialabnahme offen. P1.4 bietet echte Hintergrundbrechung als ausdrücklich gekennzeichneten Snapshot-Workflow.
 
-Aktueller verbindlicher Stand: [GLASS-P1.3.md](GLASS-P1.3.md).
+Aktueller verbindlicher Stand: [GLASS-P1.4.md](GLASS-P1.4.md).
 Langfristige 2D-/2,5D-Materialvision: [GLASS-MATERIAL-VISION.md](GLASS-MATERIAL-VISION.md).
 Historischer P1-Teststand: [GLASS-P1.md](GLASS-P1.md). Die folgenden P0-Angaben beschreiben den historischen Ausgangspunkt.
 

@@ -1,7 +1,9 @@
 # NanoTank Glass P1.3 – universelle Pixelhöhengeometrie
 
 Stand: 31.10.2026. Branch `feature/nanotank-glass`, Entwickleridentität NanoTank.
-Technischer und visueller Zwischenstand; **keine visuelle Nutzerabnahme**.
+Vom Nutzer inzwischen als geometrischer Fortschritt positiv beurteilt; die
+Materialwirkung bleibt noch nicht endgültig abgenommen. Folgestand mit Hintergrundinput:
+[GLASS-P1.4.md](GLASS-P1.4.md).
 2D-/2,5D-Materialfilter, keine 3D-Rekonstruktion oder vollständige Glaskugel.
 
 ## Bedienung und gespeicherte Effekte
