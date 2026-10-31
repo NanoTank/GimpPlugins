@@ -133,7 +133,9 @@ Glass-Anforderungen: [docs/GLASS-BRIEF.md](docs/GLASS-BRIEF.md).
 Aktueller Glass-Teststand mit echter Hintergrundbrechung als neuem Snapshot-Bild:
 [docs/GLASS-P1.4.1.md](docs/GLASS-P1.4.1.md). P1.4 ist grundsätzlich positiv abgenommen;
 P1.4.1 ist bildbasiert positiv bewertet und aktueller stabiler Entwicklungszwischenstand.
-Der Praxistest mit echten Bildern im interaktiven GIMP-Dialog steht noch aus.
+Der normale transparente Materialmodus ist praktisch bestätigt.
+[docs/GLASS-P1.4.2.md](docs/GLASS-P1.4.2.md) dokumentiert die gezielte
+Vorschauoptimierung des Pixelhöhenprofils; deren praktische Dialogabnahme steht aus.
 Der bisherige Glass-Ebenenfilter bleibt erhalten.
 
 **Status (30.10.2026):** Python-Menüintegration und tatsächlicher Aufruf des

@@ -2,7 +2,8 @@
 
 **Branch:** `feature/nanotank-glass`. **Status:** P1.4 im Grundsatz visuell positiv abgenommen, Snapshot als Zwischenstand akzeptiert. P1.4.1 ist anhand der tatsächlichen Vergleichsbilder positiv bewertet und aktueller stabiler Entwicklungszwischenstand. Praktische Benutzerprüfung mit echten Bildern im interaktiven GIMP-Dialog steht aus.
 
-Aktueller verbindlicher Stand: [GLASS-P1.4.1.md](GLASS-P1.4.1.md).
+Aktueller Performance-Teststand: [GLASS-P1.4.2.md](GLASS-P1.4.2.md), praktische Dialogabnahme ausstehend. Der normale transparente Materialmodus wurde vom Nutzer bestätigt.
+Optisch akzeptierte Grundlage: [GLASS-P1.4.1.md](GLASS-P1.4.1.md).
 Langfristige 2D-/2,5D-Materialvision: [GLASS-MATERIAL-VISION.md](GLASS-MATERIAL-VISION.md).
 Historischer P1-Teststand: [GLASS-P1.md](GLASS-P1.md). Die folgenden P0-Angaben beschreiben den historischen Ausgangspunkt.
 

@@ -39,11 +39,24 @@ nt_geo_profile(double t, double fraction, double *derivative)
  * mask and optical_path may alias. All output arrays have width*rows entries.
  * thickness is the MINIMUM positive material path, never a signed height.
  */
+/* Owned contour field: zero-initialize before first build; clear on release. */
+typedef struct {
+  int width, rows, count;
+  int *label;
+  double *phi;
+  NtGeoComponent *comp;
+  NtGeoStats stats;
+} NtGeoField;
+
+static void
+nt_geometry_field_clear(NtGeoField *field)
+{
+  free(field->label);free(field->phi);free(field->comp);
+  *field=(NtGeoField){0};
+}
+
 static int
-nt_geometry_build(const float *mask,int width,int rows,double height_px,
-                  double range_percent,double edge_px,double thickness,
-                  float *height,float *slope_x,float *slope_y,float *optical_path,
-                  NtGeoStats *stats)
+nt_geometry_field_build(const float *mask,int width,int rows,NtGeoField *field)
 {
   if(width<1 || rows<1 || (size_t)width*(size_t)rows>INT_MAX) return 0;
   size_t n=(size_t)width*rows;
@@ -98,6 +111,24 @@ nt_geometry_build(const float *mask,int width,int rows,double height_px,
   for(size_t i=0;i<n;i++) if(label[i]) {
     NtGeoComponent *c=&comp[label[i]-1];c->maximum=fmax(c->maximum,phi[i]);
   }
+  nt_geometry_field_clear(field);
+  *field=(NtGeoField){width,rows,count,label,phi,comp,{count,iteration+1,change}};
+  label=NULL;phi=NULL;comp=NULL;
+  success=1;
+done:
+  free(label);free(queue);free(phi);free(comp);return success;
+}
+
+static void
+nt_geometry_field_profile(NtGeoField *field,double height_px,double range_percent,
+                          double edge_px,double thickness,float *height,
+                          float *slope_x,float *slope_y,float *optical_path)
+{
+  int width=field->width,rows=field->rows;
+  size_t n=(size_t)width*rows;
+  int *label=field->label;double *phi=field->phi;
+  NtGeoComponent *comp=field->comp;
+  for(int c=0;c<field->count;c++)comp[c].minimum=0;
   for(size_t i=0;i<n;i++) {
     if(!label[i]) {height[i]=slope_x[i]=slope_y[i]=optical_path[i]=0;continue;}
     NtGeoComponent *c=&comp[label[i]-1];
@@ -122,9 +153,19 @@ nt_geometry_build(const float *mask,int width,int rows,double height_px,
   for(size_t i=0;i<n;i++) if(label[i])
     optical_path[i]=(float)fmax(fmax(1e-6,thickness),
                               thickness+height[i]-comp[label[i]-1].minimum);
-  if(stats) *stats=(NtGeoStats){count,iteration+1,change};
-  success=1;
-done:
-  free(label);free(queue);free(phi);free(comp);return success;
+}
+
+static inline int
+nt_geometry_build(const float *mask,int width,int rows,double height_px,
+                  double range_percent,double edge_px,double thickness,
+                  float *height,float *slope_x,float *slope_y,float *optical_path,
+                  NtGeoStats *stats)
+{
+  NtGeoField field={0};
+  if(!nt_geometry_field_build(mask,width,rows,&field))return 0;
+  nt_geometry_field_profile(&field,height_px,range_percent,edge_px,thickness,
+                            height,slope_x,slope_y,optical_path);
+  if(stats)*stats=field.stats;
+  nt_geometry_field_clear(&field);return 1;
 }
 #endif

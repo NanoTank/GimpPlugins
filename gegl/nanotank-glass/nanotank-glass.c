@@ -20,11 +20,11 @@ property_double (roundness, "Kantenwölbung (Altmodus)", 0.65)
   value_range (0.0, 1.0)
   ui_steps    (0.01, 0.10)
 
-property_boolean (preserve_alpha, "Untergrund und Alpha erhalten", TRUE)
-  description ("Ein: Opake Schilder bleiben opak, vorhandenes Alpha bleibt erhalten. Aus: neues Glas mit eigener Deckkraft.")
+property_boolean (preserve_alpha, "Glasauflage: Untergrund und Alpha erhalten", TRUE)
+  description ("Ein: ursprüngliches Material und Alpha bleiben erhalten. Aus: ursprüngliche Farbe durch transparentes Glasmaterial ersetzen; Reflexion und Tönung bestimmen dessen Alpha.")
 
-property_double (glass_opacity, "Glasdeckkraft (Tönungsdichte)", 0.32)
-  description ("Optische Dichte der Tönung ohne Alpha-Erhalt; klares Glas bleibt durchsichtig, Reflexionen ergänzen Alpha")
+property_double (glass_opacity, "Tönungsdichte (Glasdeckkraft)", 0.32)
+  description ("Nur transparentes Glasmaterial: Dichte der Tönung, nicht die gesamte Ausgabe-Deckkraft. Reflexionen und Glanz ergänzen Alpha unabhängig davon.")
   value_range (0.0, 1.0)
   ui_steps    (0.01, 0.10)
 
@@ -59,18 +59,18 @@ property_double (curvature, "Wölbung (Altmodus)", 0.30)
 property_boolean (pixel_geometry, "Pixelhöhenprofil verwenden", FALSE)
   description ("Ein: geometrische Höhe, Bereich und Kantenrundung. Aus: bisherige Einstellungen unverändert berechnen.")
 
-property_double (surface_height, "Wölbungshöhe (Pixel)", 10.0)
+property_double (surface_height, "Wölbungshöhe (Pixelprofil, Pixel)", 10.0)
   description ("Nur Pixelhöhenprofil: positiv konvex, negativ konkav; unabhängig von Glasdicke")
   value_range (-1000.0, 1000.0)
   ui_range (-100.0, 150.0)
   ui_steps (1.0, 10.0)
 
-property_double (surface_extent, "Wölbungsbereich (%)", 100.0)
+property_double (surface_extent, "Wölbungsbereich (Pixelprofil, %)", 100.0)
   description ("Nur Pixelhöhenprofil: 100 bis zur Mitte, kleinere Werte mit ebener Mitte")
   value_range (1.0, 100.0)
   ui_steps (1.0, 10.0)
 
-property_double (edge_radius, "Kantenrundung (Pixel)", 4.0)
+property_double (edge_radius, "Kantenrundung (Pixelprofil, Pixel)", 4.0)
   description ("Nur Pixelhöhenprofil: unabhängiger Außenrand; 0 für reine Linse/Halbkugel")
   value_range (0.0, 64.0)
   ui_steps (0.5, 5.0)
@@ -95,6 +95,7 @@ property_boolean (alpha_shape, "Glasform aus Ebenen-Alpha", FALSE)
 #include "gegl-op.h"
 #include <math.h>
 #include "glass-geometry.h"
+#include "glass-geometry-cache.h"
 #include "glass-optics.h"
 
 static inline gfloat
@@ -186,7 +187,8 @@ get_bounding_box (GeglOperation *operation)
 }
 
 /* Contour extent and the smoothed distance surface are global geometry
- * dependencies. Cache the full layer; no mutable geometry cache in process. */
+ * dependencies. Request the full layer; the per-instance cache independently
+ * validates the actual contour before reusing its field. */
 static GeglRectangle
 get_required_for_output (GeglOperation *operation, const gchar *pad,
                          const GeglRectangle *roi)
@@ -289,11 +291,36 @@ process (GeglOperation       *operation,
   if (!input || !output || !bounds || roi->width <= 0 || roi->height <= 0)
     return TRUE;
 
+  GeglRectangle render_roi, geometry_roi=*roi;
+  if (o->pixel_geometry && o->alpha_shape)
+    {
+      /* Read current coverage on every evaluation, including upstream edits.
+       * RGB and geometry work only cover the nonempty alpha bounds. This is
+       * not a contour shortcut: all disconnected components are included. */
+      gsize count=(gsize)bounds->width*bounds->height;
+      gfloat *coverage=g_try_new(gfloat,count);
+      if (!coverage) return FALSE;
+      gegl_buffer_get(input,bounds,1.0,babl_format("A float"),coverage,
+                      GEGL_AUTO_ROWSTRIDE,GEGL_ABYSS_NONE);
+      gint x0=bounds->width,y0=bounds->height,x1=0,y1=0;
+      for (gint yy=0;yy<bounds->height;yy++)
+        for (gint xx=0;xx<bounds->width;xx++)
+          if (coverage[(gsize)yy*bounds->width+xx]>0.0f)
+            { x0=MIN(x0,xx);y0=MIN(y0,yy);x1=MAX(x1,xx+1);y1=MAX(y1,yy+1); }
+      g_free(coverage);
+      if (o->preserve_alpha)
+        gegl_buffer_copy(input,roi,GEGL_ABYSS_NONE,output,roi);
+      else
+        gegl_buffer_clear(output,roi);
+      geometry_roi=(GeglRectangle){bounds->x+x0,bounds->y+y0,MAX(0,x1-x0),MAX(0,y1-y0)};
+      if (!gegl_rectangle_intersect(&render_roi,roi,&geometry_roi)) return TRUE;
+      roi=&render_roi;
+    }
   pad = area->left;
-  read_rect.x = roi->x - pad;
-  read_rect.y = roi->y - pad;
-  read_rect.width = roi->width + pad * 2;
-  read_rect.height = roi->height + pad * 2;
+  read_rect.x = geometry_roi.x - pad;
+  read_rect.y = geometry_roi.y - pad;
+  read_rect.width = geometry_roi.width + pad * 2;
+  read_rect.height = geometry_roi.height + pad * 2;
 
   /* Avoid integer and allocation overflow for pathological ROIs. */
   if (read_rect.width <= 0 || read_rect.height <= 0 ||
@@ -395,9 +422,9 @@ process (GeglOperation       *operation,
         for (x = 0; x < read_rect.width; x++)
           distance[(gsize)y * read_rect.width + x] =
             nt_mask (&tile, bounds, read_rect.x+x, read_rect.y+y, o->alpha_shape);
-      if (!geo_x || !geo_y || !nt_geometry_build (distance, read_rect.width,
+      if (!geo_x || !geo_y || !nt_geometry_cached (operation, distance, read_rect.width,
            read_rect.height, o->surface_height, o->surface_extent, o->edge_radius,
-           o->thickness, height, geo_x, geo_y, distance, NULL))
+           o->thickness, height, geo_x, geo_y, distance))
         {
           g_warning ("NanoTank Glass: Pixelgeometrie konnte nicht berechnet werden (Speicher oder Konvergenz).");
           g_free(src); g_free(dst); g_free(distance); g_free(height);
