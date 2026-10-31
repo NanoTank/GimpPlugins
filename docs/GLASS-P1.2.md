@@ -2,7 +2,8 @@
 
 Stand: 31.10.2026, Branch `feature/nanotank-glass`.
 P1.1 wurde vom Nutzer technisch in GIMP geprüft, ist visuell nicht abgenommen.
-P1.2 bleibt ein Teststand zur visuellen Nutzerabnahme, keine Produktionsfreigabe.
+P1.2 wurde inzwischen visuell beurteilt: deutliche Verbesserung, teils metallisch/kunststoffartig.
+Weiterhin keine Produktionsfreigabe. Folgestand: [GLASS-P1.3.md](GLASS-P1.3.md).
 
 Verbindliche Produktgrenzen: [GLASS-MATERIAL-VISION.md](GLASS-MATERIAL-VISION.md).
 Universeller 2D-/2,5D-Glasmaterialfilter, kein Button-Generator, kein 3D-Renderer.

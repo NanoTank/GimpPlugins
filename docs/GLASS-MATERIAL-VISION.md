@@ -213,3 +213,20 @@ Die vorhandene P1.2-Property `curvature` erlaubt bereits negative Faktorwerte;
 das ist kein Nachweis der hier beschriebenen Pixelhöhe oder eines vollständig
 kontrollierten konkaven Profils. P1.2-Berechnung, Regler und Installation werden
 für diese Dokumentationsergänzung nicht verändert.
+
+## P1.3-Stand und späteres lokales Relief
+
+P1.3 setzt eine ausdrücklich aktivierbare Pixelhöhengeometrie um; Details,
+mathematische Abweichungen von der früheren Distanzskizze und Kompatibilität:
+[GLASS-P1.3.md](GLASS-P1.3.md). Der alte Faktorpfad bleibt erhalten. Die
+Vorarbeiten und früheren Aussagen „noch nicht implementiert“ oben beziehen
+sich auf P1.2 und ersetzen nicht den aktuellen P1.3-Teststand.
+
+Verbindlich getrennte Beiträge bleiben **Grundgeometrie**, **Kantenprofil** und
+**optionales lokales Oberflächenrelief**. Beispielsweise kann eine konvexe
+Glasoberfläche gleichzeitig viele lokale konkave Vertiefungen tragen. Die
+signierte Grundhöhe ist kein exklusiver globaler Schalter gegen lokale Mulden.
+Ein späterer Graustufen-/Masken-/Musterinput ergänzt das gemeinsame Höhenfeld;
+Reflexionen und Brechung verwenden dessen gemeinsame endgültige Normalen.
+Optische Weglänge und unveränderte Silhouette sind dabei erneut abzusichern.
+Kein Golfball-Generator, Reliefeditor, Reliefpad oder 3D-System in P1.3.
