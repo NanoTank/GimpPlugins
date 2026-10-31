@@ -20,6 +20,20 @@ stable; detailed implementation notes belong in `docs/`.
   Script-Fu only as a *thin helper* when GEGL alone cannot handle required GIMP
   procedures (e.g. creating layers or preparing inputs); explain the need.
 
+## Public developer identity
+
+- Use **NanoTank** exclusively as Git author, committer and developer name in
+  source, documentation, license notices and generated artifacts/logs. Never use
+  private names or personal email addresses as developer identity.
+- Set repository-local `user.name=NanoTank` and
+  `user.email=2279938+NanoTank@users.noreply.github.com`; use GitHub account
+  `NanoTank`. This existing no-reply address matches the confirmed account ID.
+  Do not change global Git configuration. If the address is unknown in another
+  repository, confirm it from Git/account settings or ask before committing.
+- Check author and committer identity before new commits; do not publish private
+  identity data in test artifacts or public logs. Never rewrite existing commits
+  or force-push to change historical identity without explicit authorization.
+
 ## Sources of truth
 
 1. The current user task and its acceptance criteria.
