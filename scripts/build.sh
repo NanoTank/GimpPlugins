@@ -9,7 +9,13 @@ mkdir -p -- "$OUT" "$ROOT/output/gegl"
 
 shopt -s nullglob
 count=0
-for source in "$SRC"/nanotank-*; do
+MODULE="${1:-all}"
+case "$MODULE" in
+  all) sources=("$SRC"/nanotank-*) ;;
+  nanotank-systemtest|nanotank-glass-background) sources=("$SRC/$MODULE") ;;
+  *) echo "Unbekanntes Python-Modul: $MODULE" >&2; exit 2 ;;
+esac
+for source in "${sources[@]}"; do
   [[ -d "$source" ]] || continue
   name="$(basename -- "$source")"
   entry="$source/$name.py"

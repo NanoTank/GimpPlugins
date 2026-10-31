@@ -4,6 +4,19 @@
 set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+# GIMP may use a persisted ~/.config path rather than XDG_CONFIG_HOME. For
+# this new targeted helper, execute the same installer in the app namespace.
+# Explicit test-directory overrides keep the previous host-side path.
+if [[ "${1:-all}" == nanotank-glass-background &&
+      -z "${NANOTANK_GIMP_PLUGINS_DIR:-}" &&
+      "${NANOTANK_INSTALL_IN_FLATPAK:-0}" != 1 ]]; then
+  exec flatpak run --env=NANOTANK_INSTALL_IN_FLATPAK=1 --command=bash org.gimp.GIMP \
+    "$ROOT/scripts/install-flatpak.sh" "$@"
+fi
+if [[ "${NANOTANK_INSTALL_IN_FLATPAK:-0}" == 1 ]]; then
+  NANOTANK_GIMP_PLUGINS_DIR="$(python3 -c 'import gi; gi.require_version("Gimp", "3.0"); from gi.repository import Gimp; print(Gimp.directory())')/plug-ins"
+  NANOTANK_GEGL_PLUGINS_DIR="${XDG_DATA_HOME:?}/gegl-0.4/plug-ins"
+fi
 GIMP_PLUGINS="${NANOTANK_GIMP_PLUGINS_DIR:-$HOME/.var/app/org.gimp.GIMP/config/GIMP/3.2/plug-ins}"
 GEGL_PLUGINS="${NANOTANK_GEGL_PLUGINS_DIR:-$HOME/.var/app/org.gimp.GIMP/data/gegl-0.4/plug-ins}"
 OUT="$ROOT/output"
@@ -16,6 +29,10 @@ mkdir -p -- "$GIMP_PLUGINS" "$GEGL_PLUGINS"
 # Test the destination as GIMP sees it, not the host's symlink resolution.
 sandbox_can_read() {
   local target="$1" executable="$2"
+  if [[ "${NANOTANK_INSTALL_IN_FLATPAK:-0}" == 1 ]]; then
+    [[ -f "$target" && -r "$target" && ( "$executable" != yes || -x "$target" ) ]]
+    return
+  fi
   command -v flatpak >/dev/null 2>&1 || return 1
   flatpak run --command=sh org.gimp.GIMP -c '
     test -f "$1" && test -r "$1" && { test "$2" != yes || test -x "$1"; }
@@ -134,11 +151,22 @@ install_gegl() {
 }
 
 shopt -s nullglob
-for source in "$OUT/gimp-plug-ins"/nanotank-*; do
+MODULE="${1:-all}"
+case "$MODULE" in
+  all)
+    python_sources=("$OUT/gimp-plug-ins"/nanotank-*)
+    gegl_sources=("$OUT/gegl"/nanotank-*.so) ;;
+  nanotank-systemtest|nanotank-glass-background)
+    python_sources=("$OUT/gimp-plug-ins/$MODULE")
+    gegl_sources=()
+    [[ -d "${python_sources[0]}" ]] || { echo "Python-Modul zuerst bauen: $MODULE" >&2; exit 1; } ;;
+  *) echo "Unbekanntes Python-Modul: $MODULE" >&2; exit 2 ;;
+esac
+for source in "${python_sources[@]}"; do
   [[ -d "$source" ]] || continue
   install_plugin "$source" "$GIMP_PLUGINS/$(basename -- "$source")"
 done
-for source in "$OUT/gegl"/nanotank-*.so; do
+for source in "${gegl_sources[@]}"; do
   [[ -f "$source" ]] || continue
   install_gegl "$source" "$GEGL_PLUGINS/$(basename -- "$source")"
 done
