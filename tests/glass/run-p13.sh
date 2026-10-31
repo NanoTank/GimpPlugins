@@ -17,7 +17,7 @@ export PKG_CONFIG_PATH=/app/lib/pkgconfig
 cc -std=c11 -O2 -Wall -Wextra tests/glass/geometry.c -lm -o output/glass-p13/geometry-test
 output/glass-p13/geometry-test
 cc -std=c11 -O2 -Wall -Wextra tests/glass/geometry-render.c -o output/glass-p13/geometry-render $(pkg-config --cflags --libs gegl-0.4) -lm
-GEGL_PATH="$PWD/output/glass-p13/gegl:/app/lib/gegl-0.4" output/glass-p13/geometry-render
+GEGL_PATH="${NANOTANK_GLASS_TEST_MODULES:-$PWD/output/glass-p13/gegl}:/app/lib/gegl-0.4" output/glass-p13/geometry-render
 if [ "$2" = --compare-p12 ]; then
   GEGL_PATH="$PWD/output/glass-p13/p12-gegl:/app/lib/gegl-0.4" output/glass-p13/geometry-render --baseline
   cmp output/glass-p13/legacy.bin output/glass-p13/baseline.bin
