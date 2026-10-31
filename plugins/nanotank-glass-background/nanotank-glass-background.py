@@ -27,7 +27,7 @@ DOUBLES = [
     ("reflection", "Reflexion", 0, 1, .75),
     ("highlights", "Glanzlichter", 0, 1, .6),
     ("light-angle", "Lichtrichtung (Grad)", 0, 360, 225),
-    ("tint-strength", "Tönungsintensität", 0, 1, .2),
+    ("tint-strength", "Tönungsintensität", 0, 1, .12),
 ]
 
 
@@ -94,7 +94,7 @@ def make_snapshot(image, source, settings, show=True):
         background.update(0, 0, background.get_width(), background.get_height())
         if not background.is_valid():
             raise RuntimeError("Die Snapshot-Ausgabe konnte nicht erzeugt werden.")
-        metadata = {"version": "P1.4", "workflow": "snapshot-no-live-background",
+        metadata = {"version": "P1.4.1", "workflow": "snapshot-no-live-background",
                     "parameters": {key: value for key, value in settings.items() if key != "tint"}}
         metadata["tint-rgba"] = tuple(settings["tint"].get_rgba())
         result.attach_parasite(Gimp.Parasite.new(MARKER, 1, json.dumps(metadata).encode("utf-8")))

@@ -25,7 +25,7 @@ property_double (highlights,"Glanzlichter",0.6)
 property_double (light_angle,"Lichtrichtung (Grad)",225.0)
   value_range(0.0,360.0)
 property_color (tint,"Tönungsfarbe","#bcdff7")
-property_double (tint_strength,"Tönungsintensität",0.2)
+property_double (tint_strength,"Tönungsintensität",0.12)
   value_range(0.0,1.0)
 #else
 #define GEGL_OP_COMPOSER
@@ -55,6 +55,55 @@ static void sample(const NtBackground *b,float x,float y,float rgba[4]) {
     for(int k=0;k<3;k++) rgba[k]+=p[j][k]*p[j][3]*w[j];
   }
   if(rgba[3]>1e-8f) for(int k=0;k<3;k++) rgba[k]/=rgba[3];
+}
+/* Integrate a bounded local pixel footprint only when the warp minifies.
+ * No roughness/defocus: unit or magnified footprints retain the old sampler.
+ * Neighbours outside the silhouette are excluded from the Jacobian so the
+ * discontinuity to the unwarped background cannot become an artificial blur. */
+static void offset_at(gsize i,const float *sx,const float *sy,const float *path,
+                       float ior,float strength,float *dx,float *dy) {
+  float nz=1/sqrtf(1+sx[i]*sx[i]+sy[i]*sy[i]);
+  nt_glass_snell(sx[i]*nz,sy[i]*nz,nz,ior,path[i],strength,dx,dy);
+}
+static void footprint(const float *mask,const float *sx,const float *sy,const float *path,
+                       const GeglRectangle *r,int x,int y,float ior,float strength,
+                       float dx,float dy,float j[4]) {
+  int xx=x-r->x,yy=y-r->y;
+  gsize i=(gsize)yy*r->width+xx;
+  j[0]=j[3]=1;j[1]=j[2]=0;
+  for(int axis=0;axis<2;axis++) {
+    int step=axis?r->width:1,coord=axis?yy:xx,size=axis?r->height:r->width;
+    gboolean plus=coord+1<size && mask[i+step]>.001f;
+    gboolean minus=coord>0 && mask[i-step]>.001f;
+    float px=dx,py=dy,mx=dx,my=dy;
+    if(plus) offset_at(i+step,sx,sy,path,ior,strength,&px,&py);
+    if(minus) offset_at(i-step,sx,sy,path,ior,strength,&mx,&my);
+    if(plus || minus) {
+      float scale=plus && minus ? .5f : 1.0f;
+      j[axis*2]+=(px-mx)*scale;
+      j[axis*2+1]+=(py-my)*scale;
+    }
+  }
+}
+static void sample_footprint(const NtBackground *bg,float x,float y,float j[4],float rgba[4]) {
+  float lengths[2]={hypotf(j[0],j[1]),hypotf(j[2],j[3])};
+  float blend=nt_opt_clamp((fmaxf(lengths[0],lengths[1])-1.15f)/.5f,0,1);
+  blend=blend*blend*(3-2*blend);
+  sample(bg,x,y,rgba);
+  if(blend<=0) return;
+  for(int a=0;a<2;a++) {
+    float limit=fminf(1,2.5f/fmaxf(1e-6f,lengths[a]));
+    j[a*2]*=limit;j[a*2+1]*=limit;
+  }
+  float p[4]={0,0,0,0};
+  for(int a=-1;a<=1;a+=2) for(int b=-1;b<=1;b+=2) {
+    float tap[4];sample(bg,x+.25f*(a*j[0]+b*j[2]),y+.25f*(a*j[1]+b*j[3]),tap);
+    p[3]+=.25f*tap[3];
+    for(int k=0;k<3;k++) p[k]+=.25f*tap[k]*tap[3];
+  }
+  float alpha=(1-blend)*rgba[3]+blend*p[3];
+  for(int k=0;k<3;k++) rgba[k]=((1-blend)*rgba[k]*rgba[3]+blend*p[k])/fmaxf(1e-8f,alpha);
+  rgba[3]=alpha;
 }
 static GeglRectangle bounds(GeglOperation *op) {
   const GeglRectangle *r=gegl_operation_source_get_bounding_box(op,"input");
@@ -115,7 +164,10 @@ static gboolean process(GeglOperation *op,GeglBuffer *input,GeglBuffer *aux,Gegl
     float dx=0,dy=0,transmitted[4];
     if(o->pixel_geometry && !o->preserve_alpha)
       nt_glass_snell(nx,ny,nz,o->ior,path[i],o->refraction_strength,&dx,&dy);
-    sample(&bg,x+dx,y+dy,transmitted);
+    if(o->pixel_geometry && !o->preserve_alpha && o->refraction_strength>0 && o->ior>1) {
+      float j[4];footprint(mask,sx,sy,path,ar,x,y,o->ior,o->refraction_strength,dx,dy,j);
+      sample_footprint(&bg,x+dx,y+dy,j,transmitted);
+    } else sample(&bg,x+dx,y+dy,transmitted);
     NtGlassReflection refl=nt_glass_reflection(nx,ny,nz,o->ior,o->light_angle*G_PI/180,
                                              o->reflection,o->highlights);
     float layer_alpha;
@@ -141,6 +193,6 @@ static void gegl_op_class_init(GeglOpClass *klass) {
   op->get_cached_region=cached;op->get_invalidated_by_change=invalidated;op->threaded=FALSE;
   GEGL_OPERATION_COMPOSER_CLASS(klass)->process=process;
   gegl_operation_class_set_keys(op,"name","nanotank:glass-refraction","title","NanoTank Glass Hintergrundbrechung",
-    "categories","Artistic","description","P1.4: vollständiger Hintergrundkomposit mit separater Alphaform",NULL);
+    "categories","Artistic","description","P1.4.1: Hintergrundbrechung mit lokaler Fußabdruckfilterung",NULL);
 }
 #endif
