@@ -38,7 +38,7 @@ fi
 shopt -s nullglob
 if (( $# > 0 )); then
   case "$1" in
-    nanotank-gegl-test|nanotank-glass) ;;
+    nanotank-gegl-test|nanotank-glass|nanotank-glass-refraction) ;;
     *) echo "Unbekanntes NanoTank-Modul: $1" >&2; exit 2 ;;
   esac
   files=("$OUT/$1.so")

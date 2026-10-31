@@ -6,7 +6,7 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 MODULE="${1:-all}"
 case "$MODULE" in
-  all|nanotank-gegl-test|nanotank-glass) ;;
+  all|nanotank-gegl-test|nanotank-glass|nanotank-glass-refraction) ;;
   *) echo "Unbekanntes NanoTank-Modul: $MODULE" >&2; exit 2 ;;
 esac
 if flatpak ps --columns=application 2>/dev/null | grep -Fxq 'org.gimp.GIMP'; then

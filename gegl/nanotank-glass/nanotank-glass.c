@@ -95,6 +95,7 @@ property_boolean (alpha_shape, "Glasform aus Ebenen-Alpha", FALSE)
 #include "gegl-op.h"
 #include <math.h>
 #include "glass-geometry.h"
+#include "glass-optics.h"
 
 static inline gfloat
 nt_clamp (gfloat x, gfloat lo, gfloat hi)
@@ -492,27 +493,23 @@ process (GeglOperation       *operation,
                              powf (across / 0.85f, 4.0f));
         /* Finite radiance compressed to a display-referred reflection
          * coverage. This keeps RGB/alpha energy coupled without clipping. */
+        gfloat environment;
         if (o->pixel_geometry)
           {
-            /* Gaussian angular softboxes avoid the sharp superellipse
-             * shoulders of the legacy environment. No image-space paint. */
-            window = expf (-0.5f * powf ((along-0.64f)/0.22f, 2.0f) -
-                           0.5f * powf (across/0.65f, 2.0f));
-            window *= nt_clamp ((rz+0.15f)*4.0f, 0.0f, 1.0f);
-            card = expf (-0.5f * powf ((along+0.72f)/0.20f, 2.0f) -
-                         0.5f * powf (across/0.70f, 2.0f));
+            NtGlassReflection reflected = nt_glass_reflection(normal_x, normal_y, nz,
+              o->ior, angle, o->reflection, o->highlights);
+            surface = reflected.alpha;
+            environment = reflected.color;
           }
-        gfloat lamps = o->highlights * (o->pixel_geometry
-                      ? (9.0f * window + 1.8f * card)
-                      : (28.0f * window + 5.0f * card));
-        /* The low room exposure at the centre is unchanged. Steep
-         * surfaces reflect a darker room with greater coverage, yielding
-         * a readable opposite edge on bright backgrounds. */
-        gfloat grazing = powf (1.0f - nz, 0.65f);
-        gfloat room = 0.35f + (o->pixel_geometry ? 1.5f : 5.0f) * grazing;
-        gfloat radiance = room + lamps;
-        gfloat environment = (0.035f + lamps) / radiance;
-        surface = 1.0f - expf (-o->reflection * fresnel * radiance);
+        else
+          {
+            gfloat lamps = o->highlights * (28.0f * window + 5.0f * card);
+            gfloat grazing = powf (1.0f - nz, 0.65f);
+            gfloat room = 0.35f + 5.0f * grazing;
+            gfloat radiance = room + lamps;
+            environment = (0.035f + lamps) / radiance;
+            surface = 1.0f - expf (-o->reflection * fresnel * radiance);
+          }
 
         /* Absorption, rather than a white opaque film. At tint=0 clear
          * glass has no body alpha: RGBA cannot encode coloured transmission

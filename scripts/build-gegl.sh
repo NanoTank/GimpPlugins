@@ -7,18 +7,31 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 # Neue Module werden gezielt gebaut, nicht unbemerkt zusammen mit dem Test.
 MODULE="${1:-nanotank-gegl-test}"
 case "$MODULE" in
-  nanotank-gegl-test|nanotank-glass) ;;
+  nanotank-gegl-test|nanotank-glass|nanotank-glass-refraction) ;;
   *) echo "Unbekanntes NanoTank-GEGL-Modul: $MODULE" >&2; exit 2 ;;
 esac
 SRC="$ROOT/gegl/$MODULE/$MODULE.c"
+if [[ "$MODULE" == nanotank-glass-refraction ]]; then
+  SRC="$ROOT/gegl/nanotank-glass/$MODULE.c"
+fi
 # Isoliertes Testziel, ohne ein eventuell geladenes Installationsmodul zu ersetzen.
 BUILD_DIR="${NANOTANK_GEGL_BUILD_DIR:-$ROOT/output/gegl}"
 OUT="$BUILD_DIR/$MODULE.so"
 
 command -v flatpak >/dev/null || { echo "FEHLER: flatpak fehlt" >&2; exit 1; }
 [[ -f "$SRC" ]] || { echo "FEHLER: Quelle fehlt: $SRC" >&2; exit 1; }
-if [[ "$MODULE" == nanotank-glass && "$BUILD_DIR" == "$ROOT/output/gegl" ]]; then
-  if flatpak ps --columns=application 2>/dev/null | grep -Fxq org.gimp.GIMP; then
+if [[ "$MODULE" == nanotank-glass* && "$BUILD_DIR" == "$ROOT/output/gegl" ]]; then
+  gimp_instance_running() {
+    flatpak ps --columns=application 2>/dev/null | grep -Fxq org.gimp.GIMP
+  }
+  if gimp_instance_running; then
+    # A preceding targeted SDK build can briefly remain registered.
+    for attempt in 1 2 3 4 5 6 7 8 9 10; do
+      sleep 0.3
+      if ! gimp_instance_running; then break; fi
+    done
+  fi
+  if gimp_instance_running; then
     echo "FEHLER: GIMP vollständig schließen, bevor das Glass-Buildziel ersetzt wird." >&2
     exit 1
   fi
