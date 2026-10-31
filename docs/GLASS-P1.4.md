@@ -1,6 +1,12 @@
 # NanoTank Glass P1.4 – echte Hintergrundbrechung als Snapshot
 
-Branch `feature/nanotank-glass`, Entwickler NanoTank. P1.3 wurde vom Nutzer als
+Branch `feature/nanotank-glass`, Entwickler NanoTank.
+
+**Nachträgliche Nutzerbeurteilung:** P1.4 ist im Grundsatz visuell positiv
+abgenommen; Snapshot als Zwischenstand akzeptiert. Keine endgültige Workflow-
+oder Produktionsfreigabe. Gezielter Folgestand: [GLASS-P1.4.1.md](GLASS-P1.4.1.md).
+
+Die folgenden Angaben dokumentieren die ursprüngliche P1.4-Übergabe. P1.3 wurde vom Nutzer als
 Geometriefortschritt positiv beurteilt; die endgültige Materialabnahme bleibt offen.
 P1.4 ist eine erste nutzbare Hintergrundbrechung, **kein live aktualisierter
 Hintergrundfilter und kein editierbarer XCF-Aux-Effekt**.

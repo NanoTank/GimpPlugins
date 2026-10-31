@@ -68,6 +68,7 @@ print('XCF_SNAPSHOT_RELOAD_OK')
 # Exercise the registered procedure, not only its helper function.
 proc=Gimp.get_pdb().lookup_procedure(helper['PROCEDURE'])
 config=proc.create_config()
+assert config.get_property("tint-strength")==next(row[4] for row in helper["DOUBLES"] if row[0]=="tint-strength")
 config.set_property('run-mode',Gimp.RunMode.NONINTERACTIVE)
 config.set_property('image',img)
 config.set_core_object_array('drawables',[shape])

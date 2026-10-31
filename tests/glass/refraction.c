@@ -4,11 +4,13 @@
 #include <gegl.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #define W 384
 #define H 280
 #define N (W*H*4)
-static float bg[N],shape[N],pixels[N],reference[N],text[N];
+static float bg[N],shape[N],pixels[N],reference[N],text[N],on_pixels[N];
+static const char *gallery="output/glass-p14";
 static const GeglRectangle rect={0,0,W,H};
 static GeglNode *root,*glass,*old,*over;
 static GeglBuffer *background,*form,*output;
@@ -19,7 +21,7 @@ static void read_node(GeglNode *node) {
   for(int i=3;i<N;i+=4) g_assert(pixels[i]>=0 && pixels[i]<=1);
 }
 static void save(const char *name) {
-  char path[256];snprintf(path,sizeof path,"output/glass-p14/%s.png",name);
+  char path[512];snprintf(path,sizeof path,"%s/%s.png",gallery,name);
   GeglNode *source=gegl_node_new_child(root,"operation","gegl:buffer-source","buffer",output,NULL);
   GeglNode *sink=gegl_node_new_child(root,"operation","gegl:png-save","path",path,NULL);
   gegl_node_link(source,sink);gegl_node_process(sink);
@@ -42,7 +44,8 @@ static void fixture(int type,int partial) {
 }
 int main(int argc,char **argv) {
   gegl_init(&argc,&argv);g_assert(gegl_has_operation("nanotank:glass-refraction"));
-  g_mkdir_with_parents("output/glass-p14",0755);
+  if(getenv("NANOTANK_GLASS_GALLERY_ROOT")) gallery=getenv("NANOTANK_GLASS_GALLERY_ROOT");
+  g_mkdir_with_parents(gallery,0755);
   root=gegl_node_new();background=gegl_buffer_new(&rect,babl_format("RGBA float"));
   form=gegl_buffer_new(&rect,babl_format("RGBA float"));output=gegl_buffer_new(&rect,babl_format("RGBA float"));
   GeglNode *t=gegl_node_new_child(root,"operation","gegl:text","string","GLAS 123 GLAS\nNanoTank GLASS",
@@ -65,15 +68,25 @@ int main(int argc,char **argv) {
     double extent=scene==1?15:100,edge=scene==0?0:4;
     fixture(scene,0);
     gegl_node_set(glass,"surface-height",height,"surface-extent",extent,"edge-radius",edge,
-      "preserve-alpha",scene==4,NULL);
+      "preserve-alpha",scene==4,"tint-strength",.2,NULL);
     gegl_node_set(old,"surface-height",height,"surface-extent",extent,"edge-radius",edge,
-      "preserve-alpha",scene==4,NULL);
+      "preserve-alpha",scene==4,"tint-strength",.2,NULL);
     char name[120];read_node(b);snprintf(name,sizeof name,"%s-original",names[scene]);save(name);
     read_node(over);snprintf(name,sizeof name,"%s-p13",names[scene]);save(name);
     gegl_node_set(glass,"refraction-strength",0.0,NULL);read_node(glass);
     memcpy(reference,pixels,sizeof pixels);snprintf(name,sizeof name,"%s-off",names[scene]);save(name);
     gegl_node_set(glass,"refraction-strength",1.0,NULL);read_node(glass);
     snprintf(name,sizeof name,"%s-on",names[scene]);save(name);
+    /* Same geometric settings, but actual fresh operation defaults for the
+     * material: shows the recommended tint change separately from sampling. */
+    GeglNode *start=gegl_node_new_child(root,"operation","nanotank:glass-refraction",
+      "surface-height",height,"surface-extent",extent,"edge-radius",edge,
+      "preserve-alpha",scene==4,NULL);
+    gegl_node_link(b,start);gegl_node_connect(s,"output",start,"aux");
+    memcpy(on_pixels,pixels,sizeof pixels);read_node(start);
+    snprintf(name,sizeof name,"%s-start",names[scene]);save(name);
+    /* Preserve the original off/on comparison below. */
+    memcpy(pixels,on_pixels,sizeof pixels);
     double delta=0;
     for(int i=0;i<N;i++) delta+=fabs(pixels[i]-reference[i]);
     printf("%s mean background-refraction delta %.6f\n",names[scene],delta/N);
