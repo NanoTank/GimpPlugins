@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 /*
- * NanoTank Glass P1 - native GIMP/GEGL layer filter.
+ * NanoTank Glass P1.1 - native GIMP/GEGL layer filter.
  *
  * 2D thin-surface approximation, NOT a 3D ray tracer.  "Brechung" samples
  * this operation's own input buffer.  GIMP does not hand the operation the
@@ -23,8 +23,8 @@ property_double (roundness, "Kantenwölbung", 0.65)
 property_boolean (preserve_alpha, "Untergrund und Alpha erhalten", TRUE)
   description ("Ein: Opake Schilder bleiben opak, vorhandenes Alpha bleibt erhalten. Aus: neues Glas mit eigener Deckkraft.")
 
-property_double (glass_opacity, "Glasdeckkraft (nur ohne Alpha-Erhalt)", 0.32)
-  description ("Grunddeckkraft ohne Alpha-Erhalt; Reflexionen ergänzen eigenes Alpha")
+property_double (glass_opacity, "Glasdeckkraft (Tönungsdichte)", 0.32)
+  description ("Optische Dichte der Tönung ohne Alpha-Erhalt; klares Glas bleibt durchsichtig, Reflexionen ergänzen Alpha")
   value_range (0.0, 1.0)
   ui_steps    (0.01, 0.10)
 
@@ -52,7 +52,7 @@ property_double (refraction, "Interne Lichtbrechung (Pixel)", 2.5)
   ui_steps    (0.1, 1.0)
 
 property_double (curvature, "Wölbung", 0.30)
-  description ("Zusätzliche sanfte Verformung des eigenen Ebeneninhalts")
+  description ("Krümmung der Oberfläche: verändert Normalen, Reflexionen und interne Brechung")
   value_range (-1.0, 1.0)
   ui_steps    (0.01, 0.10)
 
@@ -275,86 +275,110 @@ process (GeglOperation       *operation,
         gfloat *out = dst + ((gsize) (y - roi->y) * roi->width + (x - roi->x)) * 4;
         gsize di = (gsize)(y - read_rect.y) * read_rect.width + x - read_rect.x;
         gfloat d = distance[di];
-        gfloat gx = (distance[di + 1] - distance[di - 1]) * 0.5f;
-        gfloat gy = (distance[di + read_rect.width] - distance[di - read_rect.width]) * 0.5f;
+        gint stride = read_rect.width;
+        /* Sobel derivative suppresses lattice-direction noise on circles. */
+        gfloat gx = (2.0f * (distance[di + 1] - distance[di - 1]) +
+                     distance[di + stride + 1] - distance[di + stride - 1] +
+                     distance[di - stride + 1] - distance[di - stride - 1]) * 0.125f;
+        gfloat gy = (2.0f * (distance[di + stride] - distance[di - stride]) +
+                     distance[di + stride + 1] - distance[di - stride + 1] +
+                     distance[di + stride - 1] - distance[di - stride - 1]) * 0.125f;
         gfloat edge = nt_clamp (1.0f - d / o->thickness, 0.0f, 1.0f);
-        gfloat slope = edge * (1.5f + 5.0f * o->roundness);
+        gfloat slope;
         gfloat magnitude = hypotf (gx, gy);
         gfloat nx = magnitude > 1e-6f ? -gx / magnitude : 0.0f;
         gfloat ny = magnitude > 1e-6f ? -gy / magnitude : 0.0f;
         gfloat u = (x - bounds->x + 0.5f) / MAX (1, bounds->width);
         gfloat v = (y - bounds->y + 0.5f) / MAX (1, bounds->height);
-        gfloat refracted[4], f0, fresnel, mirror, shine, shadow;
-        gfloat dx, dy, fill;
+        gfloat refracted[4], f0, fresnel, surface, fill;
+        gfloat dx, dy;
         gint k;
 
         if (!center)
           continue;
+        if (o->alpha_shape && center[3] <= 0.0f)
+          {
+            for (k = 0; k < 4; k++) out[k] = o->preserve_alpha ? center[k] : 0.0f;
+            continue;
+          }
 
+        /* A rounded cap rises from the contour into a shallow ellipsoidal
+         * dome. Its derivative tends smoothly to zero at the bevel join.
+         * The dome uses layer coordinates; alpha contours supply the bevel. */
+        gfloat t = nt_clamp (d / o->thickness, 0.025f, 1.0f);
+        gfloat cap = (1.0f - t) / sqrtf (fmaxf (0.02f, t * (2.0f - t)));
+        slope = (0.4f + 1.8f * o->roundness) * cap;
+        gfloat dome = 2.8f * o->curvature;
+        gfloat sx = nx * slope + (2.0f * u - 1.0f) * dome;
+        gfloat sy = ny * slope + (2.0f * v - 1.0f) * dome;
+        gfloat nz = 1.0f / sqrtf (1.0f + sx*sx + sy*sy);
+        gfloat normal_x = sx * nz, normal_y = sy * nz;
 
-
-        /* Bounded refraction inside this layer; the curvature term acts
-         * over the full layer, including its center.
-         */
-        dx = -nx * (gfloat) o->refraction * edge +
-             (u - 0.5f) * 12.0f * (gfloat) o->curvature;
-        dy = -ny * (gfloat) o->refraction * edge +
-             (v - 0.5f) * 12.0f * (gfloat) o->curvature;
-        dx *= (1.0f - 1.0f / o->ior);
-        dy *= (1.0f - 1.0f / o->ior);
+        /* Bounded thin-lens approximation, sampling this layer only. The
+         * same normals drive lighting and displacement; thickness matters. */
+        gfloat optical = (1.0f - 1.0f / o->ior);
+        gfloat travel = o->refraction * (0.35f + 0.65f * o->thickness / 12.0f);
+        travel = fminf (travel, o->refraction + o->thickness * 0.25f);
+        dx = -normal_x * optical * travel;
+        dy = -normal_y * optical * travel;
         nt_sample (&tile, x + dx, y + dy, refracted);
         if (refracted[3] < 0.01f && center[3] > 0.01f)
-          for (k = 0; k < 3; k++)
-            refracted[k] = center[k];
+          for (k = 0; k < 3; k++) refracted[k] = center[k];
 
-        /* Schlick Fresnel; slope follows the bounded silhouette distance.
-         * A 2.5D normal, not a reconstructed 3D object.
-         */
         f0 = powf ((o->ior - 1.0f) / (o->ior + 1.0f), 2.0f);
-        /* A bevel normal plus a shallow dome. An area light is evaluated
-         * against the half vector: no painted stripe in image coordinates. */
-        gfloat sx = nx * slope + (u - 0.5f) * o->curvature;
-        gfloat sy = ny * slope + (v - 0.5f) * o->curvature;
-        gfloat inv = 1.0f / sqrtf (1.0f + sx*sx + sy*sy);
-        fresnel = f0 + (1.0f - f0) * powf (1.0f - inv, 5.0f);
-        mirror = nt_clamp (o->reflection * fresnel, 0.0f, 0.95f);
-        gfloat half_dot = (sx * light_x * 0.45f + sy * light_y * 0.45f + 0.893f) * inv;
-        shine = o->highlights * o->reflection * (f0 * 9.0f) *
-                powf (nt_clamp (half_dot, 0.0f, 1.0f), 20.0f);
-        shine = nt_clamp (shine, 0.0f, 0.95f);
-        shadow = (gfloat) o->roundness * edge *
-                 fmaxf (0.0f, -(nx * light_x + ny * light_y)) * 0.23f *
-                 nt_clamp (f0 / 0.04f, 0.0f, 1.0f);
-        fill = nt_clamp ((gfloat) o->tint_strength *
-                         (0.75f + 0.25f * edge), 0.0f, 1.0f);
+        fresnel = o->ior <= 1.0 ? 0.0f :
+          f0 + (1.0f - f0) * powf (1.0f - nz, 5.0f);
 
+        /* Reflect view (0,0,1) about N. Evaluate a fixed studio environment
+         * in reflected-direction space, never a stripe in image space.
+         * A broad softbox and a weaker opposite card reveal curvature;
+         * the dim room contributes very little at normal incidence. */
+        gfloat rx = 2.0f * normal_x * nz;
+        gfloat ry = 2.0f * normal_y * nz;
+        gfloat rz = 2.0f * nz * nz - 1.0f;
+        gfloat along = rx * light_x + ry * light_y;
+        gfloat across = -rx * light_y + ry * light_x;
+        gfloat box_u = (along - 0.65f) / 0.25f;
+        gfloat box_v = across / 0.70f;
+        gfloat window = expf (-powf (box_u, 4.0f) - powf (box_v, 4.0f));
+        window *= nt_clamp ((rz + 0.15f) * 4.0f, 0.0f, 1.0f);
+        gfloat card = expf (-powf ((along + 0.72f) / 0.18f, 2.0f) -
+                             powf (across / 0.85f, 4.0f));
+        /* Finite radiance compressed to a display-referred reflection
+         * coverage. This keeps RGB/alpha energy coupled without clipping. */
+        gfloat lamps = o->highlights * (14.0f * window + 2.5f * card);
+        gfloat radiance = 0.35f + lamps;
+        gfloat environment = (0.035f + lamps) / radiance;
+        surface = 1.0f - expf (-o->reflection * fresnel * radiance);
+
+        /* Absorption, rather than a white opaque film. At tint=0 clear
+         * glass has no body alpha: RGBA cannot encode coloured transmission
+         * exactly without the background, so use a weak coloured film. */
+        fill = o->tint_strength * (0.6f + 0.4f * edge);
+        gfloat absorption[3], density = 0.0f;
         for (k = 0; k < 3; k++)
           {
-            /* Beer-Lambert-style absorption on material; transparent glass
-             * carries tint rather than black from an empty source buffer. */
-            gfloat color = o->preserve_alpha
-              ? refracted[k] * expf (-fill * (1.0f - tint[k]) * 2.0f)
-              : tint[k] * fill;
-            color *= (1.0f - shadow);
-            color = color * (1.0f - mirror) + mirror;
-            color = color * (1.0f - shine) + shine;
-            /* No clamp: keep legal scene-linear HDR channels. */
-            out[k] = color;
+            absorption[k] = fmaxf (0.0f, 1.0f - tint[k]);
+            density = fmaxf (density, absorption[k]);
           }
-        out[3] = o->preserve_alpha
-               ? center[3]
-               : (gfloat) o->glass_opacity;
-        if (!o->preserve_alpha)
+        gfloat body = 1.0f - expf (-o->glass_opacity * fill * density);
+        gfloat alpha = body + surface * (1.0f - body);
+        for (k = 0; k < 3; k++)
           {
-            gfloat body = o->glass_opacity;
-            gfloat surface = 1.0f - (1.0f - mirror) * (1.0f - shine);
-            out[3] = body + surface * (1.0f - body);
-            if (o->alpha_shape) out[3] *= center[3];
-            /* Convert the premultiplied film/reflection sum to straight RGB. */
-            for (k = 0; k < 3; k++)
-              out[k] = ((1.0f - fill * (1.0f - tint[k])) * body * (1.0f - surface) + surface) /
-                       fmaxf (body + surface * (1.0f - body), 1e-8f);
+            if (o->preserve_alpha)
+              {
+                gfloat transmitted = refracted[k] * expf (-fill * absorption[k]);
+                out[k] = transmitted * (1.0f - surface) + surface * environment;
+              }
+            else
+              {
+                gfloat film = density > 1e-8f ? 1.0f - absorption[k] / density : 0.0f;
+                out[k] = (film * body * (1.0f - surface) + surface * environment) /
+                         fmaxf (alpha, 1e-8f);
+              }
           }
+        out[3] = o->preserve_alpha ? center[3] : alpha;
+        if (!o->preserve_alpha && o->alpha_shape) out[3] *= center[3];
       }
 
   gegl_buffer_set (output, roi, 0, format, dst, GEGL_AUTO_ROWSTRIDE);

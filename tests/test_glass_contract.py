@@ -29,9 +29,7 @@ class GlassContract(unittest.TestCase):
                 self.assertIn(label, SRC)
 
     def test_alpha_preserve_contract(self):
-        self.assertIn("out[3] = o->preserve_alpha", SRC)
-        self.assertIn("? center[3]", SRC)
-        self.assertIn(": (gfloat) o->glass_opacity;", SRC)
+        self.assertIn("out[3] = o->preserve_alpha ? center[3] : alpha;", SRC)
 
     def test_local_area_processing(self):
         for symbol in ("GEGL_ABYSS_NONE", "RGBA float",

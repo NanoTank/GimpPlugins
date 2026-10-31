@@ -42,7 +42,7 @@ int main(int argc,char **argv) {
     }
     for(int i=0;i<W*H*4;i++) g_assert(fabsf(output[i]-reference[i])<2e-5f);
     if(shape!=2) for(int i=3;i<W*H*4;i+=4) g_assert(output[i]==input[i]);
-    else for(int i=3;i<W*H*4;i+=4) g_assert(output[i]>=.32f && output[i]<=1);
+    else for(int i=3;i<W*H*4;i+=4) g_assert(output[i]>=0 && output[i]<=1);
     if(shape==1) for(int i=0;i<W*H*4;i+=4) if(input[i+3]>.1f) g_assert(output[i]<1.1f);
     /* Save checker-composited preview in sRGB through GEGL. */
     GeglBuffer *preview=gegl_buffer_new(&r,babl_format("RGBA float"));
