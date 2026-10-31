@@ -75,7 +75,7 @@ keine Voraussetzung für den begrenzten P1.2-Teststand und werden nicht ungefrag
 
 ## Verbindliche Geometriesemantik: Wölbungshöhe in Pixeln
 
-Langfristig ist die Wölbung eine geometrische **Höhe H in Pixeln**, unabhängig
+Langfristig ist die Wölbung eine geometrische **vorzeichenbehaftete Höhe H in Pixeln**, unabhängig
 von Material-/Randdicke, kein nur abstrakter Faktor 0…1. Ein Kreis mit Radius R
 bekommt das kontinuierliche ellipsoide Vorderseitenprofil
 
@@ -162,3 +162,54 @@ Höhen-/Normalenstetigkeit am Plateau, unveränderte Silhouette und Alt-XCFs.
 **P1.2 implementiert H/p nicht.** Sein geglättetes Konturprofil und die bisherigen
 Faktor-/Randregler dürfen nicht als fertige Umsetzung dieser Geometrieparameter
 dargestellt werden. Keine Umfangsausweitung der laufenden Phase.
+
+
+## Verbindliche Erweiterung: konkave Oberflächen und unabhängiger Rand
+
+Die geometrische Wölbungshöhe H ist **signiert**: positive Werte wölben die
+Oberfläche nach außen, negative nach innen. Beispiele: +10 px leicht konvex,
+0 px flach, −3 px leicht konkav, −10 px deutliche Mulde. Diese Höhen sind relativ
+zur Referenzfläche des inneren Oberflächenprofils zu verstehen, nicht als
+negative absolute Materialdicke. Der Wölbungsbereich p bleibt unabhängig davon.
+
+Mindestens drei geometrische Aspekte müssen unterscheidbar bleiben:
+
+1. Außenkantenprofil: Rundung oder Fase.
+2. Innere Oberflächenwölbung: signierte geometrische Höhe H.
+3. Wölbungsbereich p: relative Ausdehnung dieser Oberflächenkrümmung.
+
+Eine konkave Tastenkappenform kann einen gerundeten Außenrand und gleichzeitig
+eine eingesenkte Mitte besitzen. Ein negatives H darf daher nicht einfach das
+gesamte Randprofil invertieren. Konzeptuell kann ein gemeinsames Höhenfeld aus
+einem unabhängigen Randprofil und dem signierten inneren Profil entstehen;
+der Anschluss muss höhen- und normalenkontinuierlich ausgelegt werden. Eine
+bloße Addition beliebiger Profile garantiert diese Anschlussbedingungen nicht.
+
+Im oben beschriebenen inneren Ansatz kann H negativ eingesetzt werden:
+`z_innen(d) = H × sqrt(q × (2-q))`. Damit kehrt sich der innere Höhenverlauf um,
+nicht die Alphasilhouette. Dies ist eine Grundlage zur späteren Prüfung, noch
+keine fertige Spezifikation für die Kombination mit einem gerundeten Außenrand.
+Der Wölbungsbereich begrenzt die Krümmung auch bei negativem H; ein Plateau
+jenseits dieses Bereichs liegt dann auf einem niedrigeren Referenzniveau.
+
+Die Normalen müssen aus dem gemeinsamen tatsächlichen Höhenfeld folgen und
+für beide Vorzeichen eine konsistente, zum Betrachter gerichtete Orientierung
+behalten. Fresnel reagiert auf den Normalenwinkel, Reflexionsrichtung und
+Glanzverteilung auf die geänderte Neigung; spätere Brechung muss dieselbe
+Geometrie verwenden. Reflexe nicht lediglich vertauschen oder per Vorzeichen
+von H aufmalen. H=0 sowie sehr kleine Objekte, schmale Bereiche, Medialachsen
+und der äußere Profilrand benötigen weiterhin endliche, stetige Normalen.
+Bei späterer optischer Weglänge/Rückseite zusätzlich sicherstellen, dass eine
+Mulde keine unbeabsichtigt negative Materialdicke erzeugt.
+
+Die Folgephase prüft positive und negative H bei Kreis, Rechteck und organischer
+Maske, insbesondere gerundeten Rand mit konkaver Mitte, p=15/100, den stetigen
+Durchgang durch H=0, unabhängige Außenrundung und unverändertes Alpha. Das
+Legacy-/XCF-Konzept gilt unverändert: gespeicherte Faktorwerte nicht still zu
+signierten Pixelhöhen umdeuten.
+
+**Einordnung:** konzeptionelle Produktanforderung für die spätere Geometriephase.
+Die vorhandene P1.2-Property `curvature` erlaubt bereits negative Faktorwerte;
+das ist kein Nachweis der hier beschriebenen Pixelhöhe oder eines vollständig
+kontrollierten konkaven Profils. P1.2-Berechnung, Regler und Installation werden
+für diese Dokumentationsergänzung nicht verändert.
