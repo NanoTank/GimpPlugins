@@ -1,112 +1,64 @@
-# NanoTank GEGL – nativer Funktionstest für GIMP 3.2 Flatpak
+# NanoTank Glass – native Entwicklung
 
-Status (30.10.2026): **Build, Flatpak-Ladung, GIMP-Filterdialog und sichtbare
-Helligkeitsänderung erfolgreich vom Nutzer abgenommen.** Noch offen: Undo/Redo,
-Ebenenfilter wieder bearbeiten, Alpha-/Auswahltests und XCF-Persistenz.
+Zielumgebung: GIMP 3.2.6 Flatpak, GEGL 0.4.72, passendes GIMP-Flatpak-SDK
+(zur Referenzabnahme `org.gnome.Sdk//51`). Entwickler: **NanoTank**.
 
-## Aktueller SDK-Befund (30.10.2026)
+## Bauen
 
-Der erste Buildversuch schlug mit `gegl-0.4.pc fehlt im GIMP-SDK` fehl.
-Deshalb prüft `build-gegl.sh` jetzt explizit die GIMP-internen
-`/app/**/pkgconfig`-Verzeichnisse und den Operationsheader
-`gegl-op.h`. Das erste Skript hatte sich zu stark auf die automatische
-`pkg-config`-Pfaderkennung verlassen.
+GIMP vor dem Ersetzen geladener Module vollständig schließen:
 
-Falls die Dateien tatsächlich fehlen, **keine Host-GEGL-Bibliotheken
-dazumischen** und keine GIMP-Einstellungen ändern. Stattdessen:
+```bash
+bash scripts/build-gegl.sh nanotank-glass &&
+bash scripts/build-gegl.sh nanotank-glass-refraction
+```
+
+Ohne Argument wird `nanotank-glass` gebaut. Quellen beider Module befinden
+sich in `gegl/nanotank-glass/`, Ausgaben in `output/gegl/`.
+Isolierte Testbuilds über `NANOTANK_GEGL_BUILD_DIR` bleiben möglich.
+
+Das Skript verwendet `flatpak run --devel --command=sh org.gimp.GIMP` und
+prüft `pkg-config`, GIMPs `/app/lib/pkgconfig/gegl-0.4.pc` sowie
+`/app/include/gegl-0.4/gegl-op.h`. Der Quellordner steht explizit im
+Include-Suchpfad, weil `gegl-op.h` die Operationsquelle erneut einbindet.
+Kein Rückfall auf Host-GEGL. Bei SDK-Problemen:
 
 ```bash
 bash scripts/diagnose-gegl-sdk.sh
 ```
 
-Die Ausgabe dokumentiert Compiler, Pfade, Bibliotheken und
-Entwicklerdateien direkt innerhalb der installierten GIMP-Flatpak-SDK-Sandbox.
-Die SDK-Pfade sind auf dem Zielrechner inzwischen bestätigt (GEGL 0.4.72,
-`/app/lib/pkgconfig/gegl-0.4.pc`, `/app/include/gegl-0.4/gegl-op.h`).
-Der Compiler scheiterte danach daran, dass `gegl-op.h` die Quelldatei
-`nanotank-gegl-test.c` ein zweites Mal inkludiert, das eigene Quellverzeichnis
-aber noch nicht im Include-Suchpfad lag. `build-gegl.sh` setzt nun explizit
-`-I"$(dirname "$src")"`. **Dieser Fix wurde lokal erfolgreich getestet.**
-Kompilierung, Installation und Menüregistrierung bleiben getrennte Tests.
+## Installation und Diagnose
 
-**Wichtig:** Folgebefehle im Terminal mit `&&` verknüpfen, damit die
-Installation bei einem fehlgeschlagenen Build nicht trotzdem anläuft.
-GEGL-Deploy erfordert außerdem, dass GIMP vollständig geschlossen ist.
-
-## Voraussetzungen
-
-- GIMP 3.2.6 als Flatpak, GEGL 0.4.72 (Versionen gemäß Nutzer-Debugausgabe).
-- Passendes `org.gnome.Sdk//51`, vom Nutzer installiert.
-- Der GIMP-Flatpak-Build muss die GEGL-Entwicklungsdateien enthalten.
-- Git-Klon unter `/home/mic/Projekte/GimpPlugins` – die Sandbox kann den
-  Projektordner laut vorheriger Diagnose lesen.
-
-## Bauen
-
-GIMP zunächst **vollständig schließen**, dann:
+Nur nach erfolgreichem Build, bei geschlossenem GIMP:
 
 ```bash
-cd ~/Projekte/GimpPlugins
-git switch feature/plugin-foundation
-git pull --ff-only
-bash scripts/build-gegl.sh && \
-bash scripts/deploy-gegl-flatpak.sh && \
-bash scripts/diagnose-gegl-flatpak.sh
+bash scripts/deploy-gegl-flatpak.sh nanotank-glass &&
+bash scripts/deploy-gegl-flatpak.sh nanotank-glass-refraction &&
+bash scripts/diagnose-gegl-flatpak.sh nanotank-glass
 ```
 
-Das Skript verwendet `flatpak run --devel --command=sh org.gimp.GIMP`,
-damit Compiler und `pkg-config` aus dem passenden GNOME-SDK und die
-GEGL-Entwicklungsdateien aus `/app` stammen. Wenn eines davon fehlt,
-bricht es ab – **kein stiller Rückfall auf Host-GEGL**.
+Das Ziel wird innerhalb der Flatpak-Umgebung ermittelt:
+`$XDG_DATA_HOME/gegl-0.4/plug-ins/`. Eigene Symlinks werden bevorzugt,
+andernfalls eindeutig markierte Kopien. Fremde Dateien werden nicht ersetzt;
+kein globales `GEGL_PATH`. Eine auslaufende SDK-Instanz wird kurz abgewartet,
+eine weiterhin laufende GIMP-Instanz verhindert das Deployment.
 
-Ausgabe: `output/gegl/nanotank-gegl-test.so`.
+Gezielt entfernen: `bash scripts/undeploy-gegl-flatpak.sh nanotank-glass`
+oder `nanotank-glass-refraction`. Ohne Argument werden beide Glass-Module
+entfernt. Dies ist keine erforderliche Maßnahme für die normale Nutzung.
 
-## In GIMP integrieren
+Der Snapshot-Helfer wird separat mit `scripts/build.sh nanotank-glass-background`
+gebaut und mit `scripts/install-flatpak.sh nanotank-glass-background` installiert.
+Eine lesbare Datei beweist noch keine GEGL-Registrierung oder Menüfunktion.
 
-Nach **erfolgreichem** Build führt die obige Befehlskette Deployment und
-Diagnose aus. Sie kann bei einem späteren erfolgreichen Build auch separat
-wiederholt werden.
+## Technische und praktische Prüfung
 
-Das Deploy-Skript legt die GEGL-Module im **über Flatpak ermittelten**
-`$XDG_DATA_HOME/gegl-0.4/plug-ins/` ab; zuerst ein Symlink
-auf den Projekt-`output`-Ordner, ersatzweise eine eindeutig markierte
-Kopie. Es ändert **nicht** `GEGL_PATH`, überschreibt keine fremden
-Dateien und verweigert die Aktualisierung, solange GIMP läuft.
+`tests/glass/` enthält die nativen Render-, Material-, Geometrie-, Cache-,
+Hintergrundbrechungs- und GIMP-/XCF-Prüfungen. Details und Aufrufparameter
+stehen in [GLASS-P1.4.2.md](GLASS-P1.4.2.md) und den dort referenzierten
+historischen Glass-Dokumenten. Testbuilds und Testprofile bleiben unter
+`output/`; vorhandene Nutzerbilder und GIMP-Einstellungen bleiben erhalten.
 
-Bei Symlink-Installation reicht nach einem Build ein GIMP-Neustart.
-Bei Kopie zusätzlich das Deploy-Skript ausführen.
-
-Anschließend GIMP starten, Bild öffnen und
-**Filter → NanoTank → GEGL-Test** suchen.
-
-## Funktionsprüfung
-
-1. Regler **Helligkeit** erscheint (-1 bis +1).
-2. Bei 0: Bild unverändert.
-3. Bei positivem Wert: Bild heller; bei negativem Wert: dunkler.
-4. Auswahlbereich testen; außerhalb der Auswahl darf nichts verändert werden.
-5. Transparente Ebene testen; Alpha soll unverändert bleiben.
-6. Effekt bestätigen, Ebenenfilter wieder öffnen und Wert verändern.
-7. Undo/Redo sowie Speichern/erneutes Öffnen einer XCF testen.
-
-Das ist **nur ein Funktionstest**, keine produktive Helligkeitskorrektur.
-Auf einer Kopie eines Testbilds arbeiten, denn ein fehlerhaftes natives
-C-Modul kann GIMP abstürzen lassen.
-
-## Fehlerdiagnose
-
-Falls der Build fehlschlägt, die **erste Fehlermeldung** des Skripts
-sichern. Falls der Build funktioniert, GIMP aber den Filter nicht zeigt:
-
-```bash
-bash scripts/diagnose-gegl-flatpak.sh
-flatpak run --verbose org.gimp.GIMP 2>&1 | tee /tmp/nanotank-gegl-gimp.log
-```
-
-Dieser Sichtbarkeitstest beweist noch keine GEGL-Registrierung.
-Abnahme erst mit sichtbarem Menüpunkt und tatsächlich funktionierendem Regler.
-
-Referenzen:
-- https://developer.gimp.org/resource/writing-a-filter/point-filter-operation/
-- https://developer.gimp.org/resource/writing-a-filter/gimp-integration/
-- https://developer.gimp.org/resource/writing-a-filter/architecture-install/
+Praktisch auf einer Bildkopie prüfen: Glass-Menü, deutsche Parameter,
+Vorschau, Alpha, Auswahl, Ebenenfilter erneut öffnen, Undo/Redo sowie
+XCF speichern und neu laden. Frühere technische Prüfungen und die bestätigte
+P1.4.2-Referenz ersetzen keine erneute interaktive Abnahme nach der Bereinigung.

@@ -24,6 +24,10 @@ if [[ ! -d "$OUT/gimp-plug-ins" ]]; then
   printf 'Zuerst: bash scripts/build.sh\n' >&2
   exit 1
 fi
+if [[ "${1:-all}" == all ]] && flatpak ps --columns=application 2>/dev/null | grep -Fxq org.gimp.GIMP; then
+  echo "Bitte GIMP vor der Installation nativer Module vollständig schließen." >&2
+  exit 1
+fi
 mkdir -p -- "$GIMP_PLUGINS" "$GEGL_PLUGINS"
 
 # Test the destination as GIMP sees it, not the host's symlink resolution.
@@ -154,9 +158,9 @@ shopt -s nullglob
 MODULE="${1:-all}"
 case "$MODULE" in
   all)
-    python_sources=("$OUT/gimp-plug-ins"/nanotank-*)
-    gegl_sources=("$OUT/gegl"/nanotank-*.so) ;;
-  nanotank-systemtest|nanotank-glass-background)
+    python_sources=("$OUT/gimp-plug-ins/nanotank-glass-background")
+    gegl_sources=("$OUT/gegl/nanotank-glass.so" "$OUT/gegl/nanotank-glass-refraction.so") ;;
+  nanotank-glass-background)
     python_sources=("$OUT/gimp-plug-ins/$MODULE")
     gegl_sources=()
     [[ -d "${python_sources[0]}" ]] || { echo "Python-Modul zuerst bauen: $MODULE" >&2; exit 1; } ;;

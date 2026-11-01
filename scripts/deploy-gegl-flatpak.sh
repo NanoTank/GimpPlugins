@@ -38,12 +38,15 @@ fi
 shopt -s nullglob
 if (( $# > 0 )); then
   case "$1" in
-    nanotank-gegl-test|nanotank-glass|nanotank-glass-refraction) ;;
+    nanotank-glass|nanotank-glass-refraction) ;;
     *) echo "Unbekanntes NanoTank-Modul: $1" >&2; exit 2 ;;
   esac
   files=("$OUT/$1.so")
 else
-  files=("$OUT"/nanotank-*.so)
+  files=()
+  for name in nanotank-glass nanotank-glass-refraction; do
+    [[ ! -f "$OUT/$name.so" ]] || files+=("$OUT/$name.so")
+  done
 fi
 if (( ${#files[@]} == 0 )); then
   echo "Keine GEGL-Module in output/gegl/. Zuerst: bash scripts/build-gegl.sh" >&2

@@ -37,9 +37,9 @@ class GlassContract(unittest.TestCase):
                        "get_bounding_box", "gegl_operation_set_format"):
             self.assertIn(symbol, SRC)
 
-    def test_shared_build_keeps_systemtest_default(self):
-        self.assertIn('MODULE="${1:-nanotank-gegl-test}"', BUILD)
-        self.assertIn("nanotank-gegl-test|nanotank-glass", BUILD)
+    def test_shared_build_defaults_to_glass(self):
+        self.assertIn('MODULE="${1:-nanotank-glass}"', BUILD)
+        self.assertIn("nanotank-glass|nanotank-glass-refraction", BUILD)
         self.assertIn("flatpak run --devel --command=sh org.gimp.GIMP", BUILD)
         self.assertIn("pkg-config --exists gegl-0.4", BUILD)
         self.assertIn("-lm", BUILD)

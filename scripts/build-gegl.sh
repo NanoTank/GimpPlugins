@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
-# Baut GEGL-Testmodul mit dem SDK der *installierten GIMP-Flatpak-App*.
+# Baut Glass mit dem SDK der *installierten GIMP-Flatpak-App*.
 set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
-# Ohne Argument bleibt der bisherige GEGL-Systemtest das Build-Ziel.
-# Neue Module werden gezielt gebaut, nicht unbemerkt zusammen mit dem Test.
-MODULE="${1:-nanotank-gegl-test}"
+# Ohne Argument wird das normale Glass-Modul gebaut.
+MODULE="${1:-nanotank-glass}"
 case "$MODULE" in
-  nanotank-gegl-test|nanotank-glass|nanotank-glass-refraction) ;;
+  nanotank-glass|nanotank-glass-refraction) ;;
   *) echo "Unbekanntes NanoTank-GEGL-Modul: $MODULE" >&2; exit 2 ;;
 esac
 SRC="$ROOT/gegl/$MODULE/$MODULE.c"

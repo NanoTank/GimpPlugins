@@ -5,9 +5,9 @@ set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 PLUGINS="${NANOTANK_GIMP_PLUGINS_DIR:-$HOME/.var/app/org.gimp.GIMP/config/GIMP/3.2/plug-ins}"
-SOURCE="$ROOT/output/gimp-plug-ins/nanotank-systemtest/nanotank-systemtest.py"
-INSTALL="$PLUGINS/nanotank-systemtest"
-ENTRY="$INSTALL/nanotank-systemtest.py"
+SOURCE="$ROOT/output/gimp-plug-ins/nanotank-glass-background/nanotank-glass-background.py"
+INSTALL="$PLUGINS/nanotank-glass-background"
+ENTRY="$INSTALL/nanotank-glass-background.py"
 
 printf 'Projekt: %s\n' "$ROOT"
 printf 'Erzeugt: %s\n' "$SOURCE"

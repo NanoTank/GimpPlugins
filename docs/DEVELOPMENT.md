@@ -8,7 +8,9 @@
 - Eingebaute GIMP-/GEGL-Funktionen bevorzugen, wo sie die Anforderungen ohne Qualitätsverlust erfüllen.
 - Alle GIMP-Prozeduren unter `<Image>/Filters/NanoTank/`, wenn die API dies zulässt.
 - Eindeutige Prozedur-IDs und Binärdateinamen mit Präfix `nanotank-`.
-- Ein Filter pro Verzeichnis / Feature-Branch. `main` enthält nur abgenommene Versionen.
+- Einzige gepflegte Bilderweiterung: Glass P1.4.2, Referenz `c233520` auf
+  `feature/nanotank-glass`. Keine neue Filterentwicklung ohne Nutzerauftrag.
+  `main` und der Referenzbranch bleiben bei der Bereinigung unverändert.
 - Visuell prüfbare Vorschau und sinnvolle Parameter statt fest einkodierter Werte.
 - Auswahlmaske, Alphakanal, Ebenen, Undo/Redo und XCF-Speichern/Laden prüfen.
 - Bei nativen GEGL-Filtern ABI und Bibliotheksversion **innerhalb** der Flatpak-Laufzeit verifizieren.

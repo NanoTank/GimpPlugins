@@ -1,147 +1,75 @@
-# NanoTank GIMP Plugins
+# NanoTank Glass P1.4.2
 
-Gemeinsame, offene Entwicklungsbasis für GIMP-3-Filter und Plug-ins.
-Zielumgebung: **Kubuntu 26.04, GIMP 3.2.6 als Flatpak** (Stand Oktober 2026).
-Lizenz: MIT (siehe [LICENSE](LICENSE)).
+Entwicklungsbasis für genau eine Bilderweiterung: **NanoTank Glass** unter
+**Filter → NanoTank → Glass**. Ziel: Kubuntu, GIMP 3.2.6 Flatpak und dessen
+GEGL 0.4.72. Entwickler: **NanoTank**. Lizenz: [MIT](LICENSE).
 
-## Codex: Projektvorgaben
+Verbindliche, vom Nutzer bestätigte Referenz: `feature/nanotank-glass`,
+Commit `c233520eb3d31957028c51fef92582802ae9060d` (P1.4.2).
+Die Projektbereinigung verändert keine Glass-Bildberechnung, Parameter oder IDs.
 
-- **[AGENTS.md](AGENTS.md)** wird beim Start einer neuen Codex-Sitzung als
-  projektweite Arbeitsanweisung geladen.
-- **[docs/FILTER-SPEC-TEMPLATE.md](docs/FILTER-SPEC-TEMPLATE.md)** ist die
-  Vorlage für neue Filter-Anforderungen.
-- Allgemeine technische Regeln: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
-- Erster konkreter Filter: [docs/GLASS-BRIEF.md](docs/GLASS-BRIEF.md).
-- Bildfilter grundsätzlich **GEGL-first**; Python/Script-Fu nur als begründete
-  Unterstützung. Keine automatischen GitHub-Actions/CI-Pipelines.
-
-
-## Ziel
-
-Alle Erweiterungen erscheinen möglichst unter **Filter → NanoTank**.
-Ein einzelnes Plug-in wird unabhängig entwickelt und getestet.
-Python/GIMP-3-API, Script-Fu oder native GEGL-Operationen werden abhängig von den Anforderungen eingesetzt.
-
-## Verzeichnisstruktur
+## Bestand
 
 | Pfad | Zweck |
 | --- | --- |
-| `plugins/` | Python-3-/GIMP-3-Quellen, jeweils eigener Ordner |
-| `scripts/` | Bauen, Sandbox-Check, Installation (Symlink oder verwaltete Kopie) und Entfernen |
-| `docs/` | Gemeinsame Konventionen und Filteranforderungen |
-| `output/gimp-plug-ins/` | Erzeugte GIMP-Plug-in-Ordner (nicht versioniert) |
-| `gegl/` | Native GEGL-C-Quellen, je Filter eigenes Verzeichnis |
-| `output/gegl/` | Kompilierte native GEGL-`.so`-Filter (nicht versioniert) |
+| `gegl/nanotank-glass/` | Glass, Hintergrundbrechung, Geometrie, Optik und Cache |
+| `plugins/nanotank-glass-background/` | Dünner GIMP-Helfer für Hintergrund-Snapshots |
+| `tests/glass/` | Native Render-, Geometrie-, Cache- und GIMP-/XCF-Prüfungen |
+| `scripts/` | Glass-Build, Installation, Entfernung und Diagnose |
+| `docs/GLASS-*.md` | Glass-Anforderungen, Entwicklung und bekannte Grenzen |
+| `output/` | Unversionierte lokale Builds und Glass-Testausgaben |
 
-## Empfohlener Entwicklungsmodus (GIMP 3.2 Flatpak)
+Glass besteht aus zwei nativen Modulen und einem Snapshot-Helfer. Das Modul
+`nanotank:glass-refraction` gehört zum Snapshot-Workflow und ist kein zusätzlicher
+produktiver Filter. Der normale Ebenenfilter bekommt nicht automatisch den
+sichtbaren Hintergrund anderer Ebenen; dafür dient der Snapshot-Helfer.
+Snapshots aktualisieren sich nicht automatisch bei späteren Hintergrundänderungen.
 
-**Direkt aus `output/` laden – ohne Symlink oder Kopie.**
+## Bauen und installieren
 
-1. Einmalig in GIMP: **Bearbeiten → Einstellungen → Ordner → Plug-ins**.
-   Dort den folgenden Ordner als **zusätzlichen** Suchpfad hinzufügen
-   (bestehende Pfade beibehalten):
-
-   `/home/mic/Projekte/GimpPlugins/output/gimp-plug-ins`
-
-   Alternativ kann derselbe Pfad passend zum lokalen Git-Klon angegeben werden.
-   In der GIMP-Flatpak-Sandbox auf der Zielmaschine ist dieser Projektpfad
-   nachweislich lesbar (Diagnose 2026-10-30). Ob GIMP den Systemtest erfolgreich
-   registriert, muss nach der Änderung in GIMP noch geprüft werden.
-
-2. Im lokalen Git-Klon:
-
-   ```bash
-   bash scripts/build.sh
-   ```
-
-3. GIMP vollständig beenden und neu starten, ein Bild öffnen und
-   **Filter → NanoTank → Systemtest** aufrufen.
-
-Bei späteren Python-Plugin-Änderungen reicht `bash scripts/build.sh` und ein
-Neustart von GIMP. Die GIMP-Menüintegration kann so auch Feature-Branches und
-Vorabversionen testen, ohne diese nach `main` zu mergen.
-
-## Alternative Installation und Diagnose
-
-Es gibt weiterhin `scripts/install-flatpak.sh` und
-`scripts/uninstall-flatpak.sh`, um einzelne NanoTank-Plug-ins in einem
-GIMP-Benutzerverzeichnis zu verlinken oder eine eindeutig markierte Kopie
-anzulegen/zu entfernen. **Auf der Zielmaschine zeigte die Flatpak-Diagnose aber,
-dass sogar eine installierte Kopie im Benutzerverzeichnis aus der Sandbox nicht
-erreichbar ist.** Diese Methode deshalb vorerst **nicht** als funktionierend
-betrachten und lieber den direkten Suchpfad verwenden.
-
-Die GIMP-3.2-Benutzerkonfiguration liegt normalerweise unter
-`$XDG_CONFIG_HOME/GIMP/3.2/` (im Flatpak-Kontext), die GIMP-Benutzer-Plug-ins
-unter `plug-ins/`. Welchen Pfad die laufende GIMP-Instanz tatsächlich scannt,
-zeigt **Bearbeiten → Einstellungen → Ordner → Plug-ins**.
-
-Für eine genaue Erreichbarkeitsprüfung:
+GIMP vor Änderungen an geladenen Modulen **vollständig schließen**.
 
 ```bash
+bash scripts/build-gegl.sh nanotank-glass &&
+bash scripts/build-gegl.sh nanotank-glass-refraction &&
+bash scripts/build.sh nanotank-glass-background
+```
+
+Die nativen Builds verwenden ausschließlich das passende GIMP-Flatpak-SDK,
+keine Host-GEGL-Bibliotheken. Ohne Argument baut `build-gegl.sh` Glass.
+
+Nach erfolgreichem Build:
+
+```bash
+bash scripts/deploy-gegl-flatpak.sh nanotank-glass &&
+bash scripts/deploy-gegl-flatpak.sh nanotank-glass-refraction &&
+bash scripts/install-flatpak.sh nanotank-glass-background
+```
+
+Anschließend GIMP neu starten. Die Skripte verwenden eigene Symlinks oder
+markierte Kopien und überschreiben keine fremden Installationen.
+Für den Python-Helfer kann alternativ `output/gimp-plug-ins` dieses Klons als
+zusätzlicher GIMP-Plug-in-Suchpfad eingetragen bleiben.
+
+## Prüfen und bedienen
+
+```bash
+python3 -m unittest discover -s tests -p 'test_*contract.py'
+bash tests/glass/run-p142.sh
+bash scripts/diagnose-gegl-flatpak.sh nanotank-glass
 bash scripts/diagnose-flatpak.sh
 ```
 
-Die Diagnose darf nie als Beleg dafür ausgegeben werden, dass GIMP das Plug-in
-bereits registriert hat. Der entscheidende Akzeptanztest ist ein sichtbarer und
-aufrufbarer **Systemtest** im GIMP-Menü. Der Eintrag verändert keine Bildpixel.
+Weitere gezielte Render-/GIMP-Tests und bekannte optische Grenzen:
+[Glass P1.4](docs/GLASS-P1.4.md), [P1.4.1](docs/GLASS-P1.4.1.md),
+[P1.4.2](docs/GLASS-P1.4.2.md). Historische Prüfstände bleiben als Dokumentation
+erhalten; die aktuelle Referenz ist die oben genannte P1.4.2.
 
-Das `output/gegl/`-Verzeichnis ist separat. Native GEGL-Operationen verwenden
-einen anderen Ladevorgang; ihre Entwicklung/Installation ist noch nicht fertig
-implementiert und muss separat in der Flatpak-Sandbox getestet werden.
+Vorhandene Glass-XCF auf einer Kopie öffnen, Effekt erneut bearbeiten,
+Material- und Geometrieregler prüfen, Undo/Redo sowie Speichern/Neuladen testen.
+Technische Batchtests ersetzen keine neue interaktive Nutzerabnahme.
 
-- **GEGL SDK:** Ein erster Build scheiterte an fehlender pkg-config-Erkennung.
-  `scripts/build-gegl.sh` prüft jetzt GIMP-interne `/app`-Pfade;
-  `bash scripts/diagnose-gegl-sdk.sh` liefert bei Problemen eine
-  lesende Diagnose. **Native GEGL-Tests sind noch nicht abgenommen.**
-
-## Native GEGL-Filter (neue Testinfrastruktur)
-
-Der einfache native Testfilter wird unter `gegl/nanotank-gegl-test/` entwickelt
-und später unter **Filter → NanoTank → GEGL-Test** angezeigt, wenn die
-lokale Kompilierung und die Flatpak-Ladung erfolgreich sind. Er hat einen
-Helligkeitsregler und bewahrt den Alphakanal. **Status: noch nicht lokal
-auf dem Zielrechner getestet.**
-
-```bash
-# Vorher GIMP vollständig beenden:
-bash scripts/build-gegl.sh && \
-bash scripts/deploy-gegl-flatpak.sh && \
-bash scripts/diagnose-gegl-flatpak.sh
-```
-
-Das Build-Skript nutzt **das mit GIMP gebundene Flatpak-SDK**
-(`flatpak run --devel --command=sh org.gimp.GIMP`) und verifiziert
-`pkg-config gegl-0.4`; es fällt niemals still auf die Kubuntu-Host-Bibliothek
-zurück. Ausgabe: `output/gegl/nanotank-gegl-test.so`.
-
-Das Deploy-Skript erstellt pro GEGL-Modul einen Link auf diesen Output
-**innerhalb der GIMP-Flatpak-Sandbox** und verwendet nur bei Bedarf eine
-verwaltete Kopie. Es überschreibt keine unbekannten Dateien, setzt
-`GEGL_PATH` nicht und ändert keine fremden Plug-ins.
-
-Entfernen (bei beendetem GIMP):
-`bash scripts/undeploy-gegl-flatpak.sh`
-
-Die vollständige Anleitung, Tests und Fehlerdiagnose stehen unter
-[docs/GEGL-DEVELOPMENT.md](docs/GEGL-DEVELOPMENT.md).
-
-## Entwicklungsregeln
-
-Siehe [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
-Glass-Anforderungen: [docs/GLASS-BRIEF.md](docs/GLASS-BRIEF.md).
-Aktueller Glass-Teststand mit echter Hintergrundbrechung als neuem Snapshot-Bild:
-[docs/GLASS-P1.4.1.md](docs/GLASS-P1.4.1.md). P1.4 ist grundsätzlich positiv abgenommen;
-P1.4.1 ist bildbasiert positiv bewertet und aktueller stabiler Entwicklungszwischenstand.
-Der normale transparente Materialmodus ist praktisch bestätigt.
-[docs/GLASS-P1.4.2.md](docs/GLASS-P1.4.2.md) dokumentiert die gezielte
-Vorschauoptimierung des Pixelhöhenprofils; deren praktische Dialogabnahme steht aus.
-Der bisherige Glass-Ebenenfilter bleibt erhalten.
-
-**Status (30.10.2026):** Python-Menüintegration und tatsächlicher Aufruf des
-Systemtests in GIMP 3.2.6 Flatpak auf Kubuntu vom Nutzer erfolgreich abgenommen.
-Der Screenshot zeigt die GIMP-Meldung „NanoTank-Systemtest erfolgreich: Plug-in geladen.“
-Auch der native GEGL-Helligkeitstest wurde erfolgreich gegen GEGL 0.4.72
-kompiliert, in GIMP geladen und mit sichtbarer Helligkeitsänderung und
-regulärem Einstellungsdialog vom Nutzer abgenommen. Undo/Redo, persistente
-Ebenenfilter, XCF-Speichern/Laden und Alphakanal sind noch separat zu testen.
+Build-Diagnose: [GEGL-Entwicklung](docs/GEGL-DEVELOPMENT.md).
+Projektregeln: [AGENTS.md](AGENTS.md), [Entwicklung](docs/DEVELOPMENT.md).
+Bereinigungsnachweis: [Glass-only](docs/GLASS-ONLY-CLEANUP.md).
+Kein automatischer Push, Merge, Release oder CI-Build.

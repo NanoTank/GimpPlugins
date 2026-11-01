@@ -67,10 +67,10 @@ trade-off or ask for the missing product decision where essential.
 
 - Keep each filter in its own feature branch and source directory (e.g.
   `gegl/nanotank-glass/`). Do not change unrelated filters or their output.
-- Reference native test: `gegl/nanotank-gegl-test/`.
-  `bash scripts/build-gegl.sh` currently builds **only** that GEGL test;
-  do not assume it compiles every new filter. Add a targeted build path when
-  implementing a new filter.
+- Only Glass P1.4.2 is maintained. Reference: `feature/nanotank-glass`,
+  commit `c233520`. No new filter development without an explicit user task.
+  `bash scripts/build-gegl.sh` builds Glass; build the background module
+  explicitly with `bash scripts/build-gegl.sh nanotank-glass-refraction`.
 - Native modules are built against the **GIMP Flatpak SDK**, not accidentally
   linked to Kubuntu host GEGL. Check `pkg-config`, `gegl-op.h`, and the
   resulting module's runtime compatibility.

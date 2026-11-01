@@ -82,7 +82,6 @@ GIMP neu starten und auf einer **Testkopie** Filter → NanoTank → Glass ausf�
 - [ ] Auswahlrechteck, freie Auswahl und weiche Auswahl: GIMP begrenzt das Ergebnis auf diese Maske.
 - [ ] 8-bit sowie 16/32-bit (falls möglich); Bild- und Ebenenrandfälle.
 - [ ] Undo/Redo, Ebenenfilter erneut öffnen, XCF speichern/öffnen und exportieren.
-- [ ] Der bisherige NanoTank GEGL-Test bleibt unberührt.
 - [ ] Nutzer hat tatsächliche Glaswirkung visuell abgenommen.
 
 ## Nächste Ausbaustufe

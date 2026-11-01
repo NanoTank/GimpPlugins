@@ -6,9 +6,13 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 GIMP_PLUGINS="${NANOTANK_GIMP_PLUGINS_DIR:-$HOME/.var/app/org.gimp.GIMP/config/GIMP/3.2/plug-ins}"
 GEGL_PLUGINS="${NANOTANK_GEGL_PLUGINS_DIR:-$HOME/.var/app/org.gimp.GIMP/data/gegl-0.4/plug-ins}"
+if flatpak ps --columns=application 2>/dev/null | grep -Fxq org.gimp.GIMP; then
+  echo "Bitte GIMP vor der Entfernung vollständig schließen." >&2
+  exit 1
+fi
 shopt -s nullglob
 
-for item in "$GIMP_PLUGINS"/nanotank-*; do
+for item in "$GIMP_PLUGINS/nanotank-glass-background"; do
   if [[ -L "$item" && "$(readlink -- "$item")" == "$ROOT/output/gimp-plug-ins/$(basename -- "$item")" ]]; then
     rm -- "$item"
     printf 'NanoTank-Link entfernt: %s\n' "$item"
@@ -18,7 +22,7 @@ for item in "$GIMP_PLUGINS"/nanotank-*; do
     printf 'NanoTank-Kopie entfernt: %s\n' "$item"
   fi
 done
-for item in "$GEGL_PLUGINS"/nanotank-*.so; do
+for item in "$GEGL_PLUGINS/nanotank-glass.so" "$GEGL_PLUGINS/nanotank-glass-refraction.so"; do
   expected="$ROOT/output/gegl/$(basename -- "$item")"
   marker="$(dirname -- "$item")/.nanotank-$(basename -- "$item").origin"
   if [[ -L "$item" && "$(readlink -- "$item")" == "$expected" ]]; then

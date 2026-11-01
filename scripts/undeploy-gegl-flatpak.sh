@@ -6,7 +6,7 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 MODULE="${1:-all}"
 case "$MODULE" in
-  all|nanotank-gegl-test|nanotank-glass|nanotank-glass-refraction) ;;
+  all|nanotank-glass|nanotank-glass-refraction) ;;
   *) echo "Unbekanntes NanoTank-Modul: $MODULE" >&2; exit 2 ;;
 esac
 if flatpak ps --columns=application 2>/dev/null | grep -Fxq 'org.gimp.GIMP'; then
@@ -19,7 +19,7 @@ flatpak run --command=sh org.gimp.GIMP -c '
   wanted="$2"
   dest_dir="${XDG_DATA_HOME:?}/gegl-0.4/plug-ins"
   [ -d "$dest_dir" ] || exit 0
-  for dest in "$dest_dir"/nanotank-*.so; do
+  for dest in "$dest_dir/nanotank-glass.so" "$dest_dir/nanotank-glass-refraction.so"; do
     [ -e "$dest" ] || [ -L "$dest" ] || continue
     name="${dest##*/}"
     [ "$wanted" = all ] || [ "$name" = "$wanted.so" ] || continue

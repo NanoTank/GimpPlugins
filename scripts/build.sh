@@ -11,8 +11,8 @@ shopt -s nullglob
 count=0
 MODULE="${1:-all}"
 case "$MODULE" in
-  all) sources=("$SRC"/nanotank-*) ;;
-  nanotank-systemtest|nanotank-glass-background) sources=("$SRC/$MODULE") ;;
+  all) sources=("$SRC/nanotank-glass-background") ;;
+  nanotank-glass-background) sources=("$SRC/$MODULE") ;;
   *) echo "Unbekanntes Python-Modul: $MODULE" >&2; exit 2 ;;
 esac
 for source in "${sources[@]}"; do
